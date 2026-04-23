@@ -16,7 +16,7 @@ var schemaSQL string
 
 // SchemaVersion is the current SQLite schema version.
 // Bump this when adding new migration steps below.
-const SchemaVersion = 26
+const SchemaVersion = 27
 
 // migrations maps version → SQL to apply when upgrading FROM that version.
 // schema.sql always represents the LATEST full schema (for fresh DBs).
@@ -502,6 +502,7 @@ CREATE TRIGGER IF NOT EXISTS trg_vault_docs_scope_consistency_upd
 	24: `ALTER TABLE vault_documents ADD COLUMN chat_id TEXT;
 CREATE INDEX IF NOT EXISTS idx_vault_docs_team_chat ON vault_documents(team_id, chat_id) WHERE team_id IS NOT NULL;`,
 
+<<<<<<< HEAD
 	// Version 25 → 26: change agent_heartbeats.provider_id FK to ON DELETE SET NULL
 	// (mirrors PG migration 000057). SQLite cannot ALTER FK clauses, so the table
 	// must be rebuilt. Explicit 25-column INSERT/SELECT to avoid silent column drift.
@@ -561,6 +562,13 @@ ALTER TABLE agent_heartbeats_new RENAME TO agent_heartbeats;
 CREATE INDEX IF NOT EXISTS idx_heartbeats_due
   ON agent_heartbeats(next_run_at)
   WHERE enabled = 1 AND next_run_at IS NOT NULL;`,
+
+	// Version 26 → 27: rename Zalo channel types to align with Zalo's own
+	// product taxonomy (mirrors PG migration 000058). Three-step swap via
+	// zalo_oa_tmp sentinel — defensive against future unique constraints.
+	26: `UPDATE channel_instances SET channel_type = 'zalo_oa_tmp' WHERE channel_type = 'zalo_oauth';
+UPDATE channel_instances SET channel_type = 'zalo_bot'    WHERE channel_type = 'zalo_oa';
+UPDATE channel_instances SET channel_type = 'zalo_oa'     WHERE channel_type = 'zalo_oa_tmp';`,
 }
 
 // addHooksTables is the SQLite incremental migration for schema v19 → v20.
