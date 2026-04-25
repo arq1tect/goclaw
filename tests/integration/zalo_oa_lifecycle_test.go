@@ -40,7 +40,7 @@ func TestZaloOALifecycle(t *testing.T) {
 	db := testDB(t)
 
 	tenantID, agentID := seedTenantAgent(t, db)
-	ciStore := pg.NewPGChannelInstanceStore(db, "test-encryption-key-32-byte-min!!")
+	ciStore := pg.NewPGChannelInstanceStore(db, testEncryptionKey)
 
 	mock := newMockZaloServer(t)
 
