@@ -148,6 +148,7 @@ type ZaloConfig struct {
 	Token         string              `json:"token"`
 	AllowFrom     FlexibleStringSlice `json:"allow_from"`
 	DMPolicy      string              `json:"dm_policy,omitempty"` // "pairing" (default), "allowlist", "open", "disabled"
+	Transport     string              `json:"transport,omitempty"` // "polling" (default) | "webhook"
 	WebhookURL    string              `json:"webhook_url,omitempty"`
 	WebhookSecret string              `json:"webhook_secret,omitempty"`
 	MediaMaxMB    int                 `json:"media_max_mb,omitempty"` // default 5
@@ -169,6 +170,12 @@ type ZaloOAConfig struct {
 	AllowFrom            FlexibleStringSlice `json:"allow_from,omitempty"`
 	DMPolicy             string              `json:"dm_policy,omitempty"`
 	BlockReply           *bool               `json:"block_reply,omitempty"`
+
+	// Webhook transport (phase 05). Polling is the default.
+	Transport                  string `json:"transport,omitempty"`                     // "polling" (default) | "webhook"
+	WebhookSignatureMode       string `json:"webhook_signature_mode,omitempty"`        // "strict" (default) | "log_only" | "disabled"
+	WebhookReplayWindowSeconds int    `json:"webhook_replay_window_seconds,omitempty"` // default 300, clamp [60, 3600]
+	CatchUpOnRestart           bool   `json:"catch_up_on_restart,omitempty"`           // single bounded listrecentchat sweep on Start (off by default)
 }
 
 type ZaloPersonalConfig struct {

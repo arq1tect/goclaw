@@ -13,6 +13,29 @@ import (
 
 const maxMediaBytes = 10 * 1024 * 1024 // 10MB
 
+// isHTTPURL reports whether u is an http or https URL. Bot's sendPhoto API
+// only accepts remote URLs; local paths must be rejected.
+func isHTTPURL(u string) bool {
+	return strings.HasPrefix(u, "http://") || strings.HasPrefix(u, "https://")
+}
+
+// mergeTrailingText joins caption + content with a blank line. Mirrors
+// zalo/oa's mergeTrailingText so users see consistent layout across channels.
+func mergeTrailingText(caption, content string) string {
+	caption = strings.TrimSpace(caption)
+	content = strings.TrimSpace(content)
+	switch {
+	case caption == "" && content == "":
+		return ""
+	case caption == "":
+		return content
+	case content == "":
+		return caption
+	default:
+		return caption + "\n\n" + content
+	}
+}
+
 func (c *Channel) sendChunkedText(chatID, text string) error {
 	for _, chunk := range channels.ChunkMarkdown(text, maxTextLength) {
 		if err := c.sendMessage(chatID, chunk); err != nil {
