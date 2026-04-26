@@ -227,14 +227,8 @@ func init() {
 		// Zalo OA OAuth 渠道
 		MsgZaloOACodeExchangeFailed: "Zalo OAuth 授权码交换失败:%s",
 		MsgZaloOAInvalidChannelType: "实例不是 zalo_oa 类型",
-		MsgZaloOAConnected:          "已连接 Zalo 公众号:%s",
-		MsgZaloOAInvalidState:       "OAuth state 令牌无效或已过期",
-		MsgZaloOARefreshFailed:      "Zalo OAuth 刷新令牌失败:%s",
-		MsgZaloOAReauthRequired:     "需要重新授权 Zalo OAuth — 请粘贴新的同意码",
-		MsgZaloOATokenInvalid:       "Zalo API 拒绝了 access token",
-		MsgZaloOAMediaTooLarge:      "媒体超过大小限制(%d MB)",
-		MsgZaloOAWindowExpired:      "48 小时互动窗口已过期 — 用户需先向 OA 发送消息",
-		MsgZaloOARateLimited:        "Zalo OAuth 被限流;暂停轮询 30 秒",
+		MsgZaloOAConnected:           "已连接 Zalo 公众号:%s",
+		MsgZaloOAInvalidState:        "OAuth state 令牌无效或已过期",
 		MsgZaloOARedirectURIRequired: "credentials.redirect_uri 必填,且必须与 Zalo 开发者控制台注册的回调完全一致",
 
 		// Message tool cross-target forward notice

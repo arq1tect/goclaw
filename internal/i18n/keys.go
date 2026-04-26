@@ -232,13 +232,7 @@ const (
 	// --- Zalo OA OAuth channel ---
 	MsgZaloOACodeExchangeFailed = "error.zalo_oa_code_exchange_failed" // "zalo oauth code exchange failed: %s"
 	MsgZaloOAInvalidChannelType = "error.zalo_oa_invalid_channel_type" // "instance is not a zalo_oa channel"
-	MsgZaloOAConnected          = "info.zalo_oa_connected"             // "zalo official account connected: %s"
-	MsgZaloOAInvalidState       = "error.zalo_oa_invalid_state"        // "oauth state token is invalid or expired"
-	MsgZaloOARefreshFailed      = "error.zalo_oa_refresh_failed"       // "zalo oauth token refresh failed: %s"
-	MsgZaloOAReauthRequired     = "error.zalo_oa_reauth_required"      // "zalo oauth re-authorization required"
-	MsgZaloOATokenInvalid       = "error.zalo_oa_token_invalid"        // "zalo oauth access token rejected by API"
-	MsgZaloOAMediaTooLarge      = "error.zalo_oa_media_too_large"      // "media exceeds size limit (%d MB)"
-	MsgZaloOAWindowExpired      = "error.zalo_oa_window_expired"       // "48-hour user-interaction window expired"
-	MsgZaloOARateLimited        = "warn.zalo_oa_rate_limited"          // "zalo oauth rate limited; backing off"
+	MsgZaloOAConnected           = "info.zalo_oa_connected"              // "zalo official account connected: %s"
+	MsgZaloOAInvalidState        = "error.zalo_oa_invalid_state"         // "oauth state token is invalid or expired"
 	MsgZaloOARedirectURIRequired = "error.zalo_oa_redirect_uri_required" // "credentials.redirect_uri is required and must match the dev-console callback"
 )

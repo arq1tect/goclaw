@@ -227,14 +227,8 @@ func init() {
 		// Zalo OA OAuth channel
 		MsgZaloOACodeExchangeFailed: "zalo oauth code exchange failed: %s",
 		MsgZaloOAInvalidChannelType: "instance is not a zalo_oa channel",
-		MsgZaloOAConnected:          "zalo official account connected: %s",
-		MsgZaloOAInvalidState:       "oauth state token is invalid or expired",
-		MsgZaloOARefreshFailed:      "zalo oauth token refresh failed: %s",
-		MsgZaloOAReauthRequired:     "zalo oauth re-authorization required — paste a new consent code",
-		MsgZaloOATokenInvalid:       "zalo oauth access token rejected by API",
-		MsgZaloOAMediaTooLarge:      "media exceeds size limit (%d MB)",
-		MsgZaloOAWindowExpired:      "48-hour user-interaction window expired — recipient must message the OA first",
-		MsgZaloOARateLimited:        "zalo oauth rate limited; backing off polling for 30 seconds",
+		MsgZaloOAConnected:           "zalo official account connected: %s",
+		MsgZaloOAInvalidState:        "oauth state token is invalid or expired",
 		MsgZaloOARedirectURIRequired: "credentials.redirect_uri is required and must exactly match the callback registered in your Zalo developer console",
 
 		// Message tool cross-target forward notice

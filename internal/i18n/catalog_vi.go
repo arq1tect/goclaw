@@ -227,14 +227,8 @@ func init() {
 		// Zalo OA OAuth channel
 		MsgZaloOACodeExchangeFailed: "đổi mã xác thực Zalo OAuth thất bại: %s",
 		MsgZaloOAInvalidChannelType: "kênh không phải loại zalo_oa",
-		MsgZaloOAConnected:          "đã kết nối tài khoản Zalo OA: %s",
-		MsgZaloOAInvalidState:       "mã state OAuth không hợp lệ hoặc đã hết hạn",
-		MsgZaloOARefreshFailed:      "làm mới token Zalo OAuth thất bại: %s",
-		MsgZaloOAReauthRequired:     "cần cấp quyền lại Zalo OAuth — hãy dán mã consent mới",
-		MsgZaloOATokenInvalid:       "API Zalo từ chối access token",
-		MsgZaloOAMediaTooLarge:      "tệp đính kèm vượt quá giới hạn (%d MB)",
-		MsgZaloOAWindowExpired:      "đã quá cửa sổ tương tác 48 giờ — người dùng cần nhắn cho OA trước",
-		MsgZaloOARateLimited:        "Zalo OAuth bị giới hạn tốc độ; tạm dừng polling 30 giây",
+		MsgZaloOAConnected:           "đã kết nối tài khoản Zalo OA: %s",
+		MsgZaloOAInvalidState:        "mã state OAuth không hợp lệ hoặc đã hết hạn",
 		MsgZaloOARedirectURIRequired: "credentials.redirect_uri là bắt buộc và phải khớp chính xác với callback đã đăng ký trong Zalo developer console",
 
 		// Message tool cross-target forward notice
