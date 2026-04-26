@@ -6,6 +6,7 @@ import (
 	"github.com/nextlevelbuilder/goclaw/internal/bus"
 	"github.com/nextlevelbuilder/goclaw/internal/cache"
 	"github.com/nextlevelbuilder/goclaw/internal/channels"
+	zalocommon "github.com/nextlevelbuilder/goclaw/internal/channels/zalo/common"
 	"github.com/nextlevelbuilder/goclaw/internal/config"
 	"github.com/nextlevelbuilder/goclaw/internal/eventbus"
 	"github.com/nextlevelbuilder/goclaw/internal/gateway"
@@ -26,6 +27,10 @@ type gatewayDeps struct {
 	pgStores         *store.Stores
 	providerRegistry *providers.Registry
 	channelMgr       *channels.Manager
+	// zaloRouter is the single shared webhook router for both zalo_bot and
+	// zalo_oa channel instances. Mounted on the mux at /channels/zalo/webhook.
+	// Channels self-register at Start() and self-unregister at Stop().
+	zaloRouter *zalocommon.Router
 	agentRouter      *agent.Router
 	toolsReg         *tools.Registry
 	skillsLoader     *skills.Loader // optional: enables skill creation in evolution approval

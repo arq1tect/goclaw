@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/nextlevelbuilder/goclaw/internal/channels"
+	"github.com/nextlevelbuilder/goclaw/internal/channels/zalo/common"
 )
 
 // message is a single entry in the /v2.0/oa/listrecentchat response. This
@@ -142,13 +143,11 @@ func (c *Channel) dispatchInbound(m message) {
 	if m.Text == "" {
 		return
 	}
-	metadata := map[string]string{
-		"message_id": m.MessageID,
-		"platform":   "zalo_oa",
-	}
-	if m.FromDisplayName != "" {
-		metadata["sender_display_name"] = m.FromDisplayName
-	}
+	metadata := common.InboundMeta{
+		MessageID:         m.MessageID,
+		Platform:          common.PlatformZaloOA,
+		SenderDisplayName: m.FromDisplayName,
+	}.ToMap()
 	c.BaseChannel.HandleMessage(m.FromID, m.FromID, m.Text, nil, metadata, "direct")
 }
 

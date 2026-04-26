@@ -17,6 +17,7 @@ import (
 
 	"github.com/nextlevelbuilder/goclaw/internal/bus"
 	"github.com/nextlevelbuilder/goclaw/internal/channels"
+	"github.com/nextlevelbuilder/goclaw/internal/channels/zalo/common"
 	"github.com/nextlevelbuilder/goclaw/internal/config"
 	"github.com/nextlevelbuilder/goclaw/internal/store"
 )
@@ -38,6 +39,12 @@ type Channel struct {
 	client     *http.Client
 	pollClient *http.Client
 	// pairingService, pairingDebounce are inherited from channels.BaseChannel.
+
+	// webhookRouter is the shared Zalo router for the gateway. Wired by
+	// FactoryWithRouter; nil for callers that still use the legacy Factory
+	// (e.g. legacy single-tenant config path). Phase 04 calls
+	// router.RegisterInstance(...) when transport=webhook.
+	webhookRouter *common.Router
 
 	// legacyPhotoSentinelWarn fires once-per-process if any caller still
 	// emits the deprecated [photo:URL] sentinel after the Media[] migration.

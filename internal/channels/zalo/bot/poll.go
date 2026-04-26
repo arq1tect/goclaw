@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/nextlevelbuilder/goclaw/internal/channels"
+	"github.com/nextlevelbuilder/goclaw/internal/channels/zalo/common"
 	"github.com/nextlevelbuilder/goclaw/internal/store"
 )
 
@@ -96,10 +97,11 @@ func (c *Channel) handleTextMessage(msg *zaloMessage) {
 		"preview", channels.Truncate(content, 50),
 	)
 
-	metadata := map[string]string{
-		"message_id": msg.MessageID,
-		"platform":   "zalo",
-	}
+	metadata := common.InboundMeta{
+		MessageID:         msg.MessageID,
+		Platform:          common.PlatformZaloBot,
+		SenderDisplayName: msg.From.Username,
+	}.ToMap()
 
 	c.HandleMessage(senderID, chatID, content, nil, metadata, "direct")
 }
@@ -154,10 +156,11 @@ func (c *Channel) handleImageMessage(msg *zaloMessage) {
 		"has_media", len(media) > 0,
 	)
 
-	metadata := map[string]string{
-		"message_id": msg.MessageID,
-		"platform":   "zalo",
-	}
+	metadata := common.InboundMeta{
+		MessageID:         msg.MessageID,
+		Platform:          common.PlatformZaloBot,
+		SenderDisplayName: msg.From.Username,
+	}.ToMap()
 
 	c.HandleMessage(senderID, chatID, content, media, metadata, "direct")
 }

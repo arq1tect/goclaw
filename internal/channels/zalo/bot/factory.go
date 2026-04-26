@@ -6,6 +6,7 @@ import (
 
 	"github.com/nextlevelbuilder/goclaw/internal/bus"
 	"github.com/nextlevelbuilder/goclaw/internal/channels"
+	"github.com/nextlevelbuilder/goclaw/internal/channels/zalo/common"
 	"github.com/nextlevelbuilder/goclaw/internal/config"
 	"github.com/nextlevelbuilder/goclaw/internal/store"
 )
@@ -25,9 +26,26 @@ type zaloInstanceConfig struct {
 	BlockReply *bool    `json:"block_reply,omitempty"`
 }
 
-// Factory creates a Zalo OA channel from DB instance data.
+// Factory creates a Zalo Bot channel from DB instance data without a
+// shared webhook router. Kept for back-compat with call sites that don't
+// yet wire the router; new code should prefer FactoryWithRouter.
 func Factory(name string, creds json.RawMessage, cfg json.RawMessage,
 	msgBus *bus.MessageBus, pairingSvc store.PairingStore) (channels.Channel, error) {
+	return buildFromInstance(name, creds, cfg, msgBus, pairingSvc, nil)
+}
+
+// FactoryWithRouter is the preferred factory: it threads the shared
+// webhook router into the channel so phases 04+ can register/unregister
+// per-instance webhook handlers at Start()/Stop().
+func FactoryWithRouter(router *common.Router) channels.ChannelFactory {
+	return func(name string, creds json.RawMessage, cfg json.RawMessage,
+		msgBus *bus.MessageBus, pairingSvc store.PairingStore) (channels.Channel, error) {
+		return buildFromInstance(name, creds, cfg, msgBus, pairingSvc, router)
+	}
+}
+
+func buildFromInstance(name string, creds json.RawMessage, cfg json.RawMessage,
+	msgBus *bus.MessageBus, pairingSvc store.PairingStore, router *common.Router) (channels.Channel, error) {
 
 	var c zaloCreds
 	if len(creds) > 0 {
@@ -61,7 +79,7 @@ func Factory(name string, creds json.RawMessage, cfg json.RawMessage,
 	if err != nil {
 		return nil, err
 	}
-
+	ch.webhookRouter = router
 	ch.SetName(name)
 	return ch, nil
 }

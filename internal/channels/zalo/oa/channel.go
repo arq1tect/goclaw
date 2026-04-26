@@ -16,6 +16,7 @@ import (
 
 	"github.com/nextlevelbuilder/goclaw/internal/bus"
 	"github.com/nextlevelbuilder/goclaw/internal/channels"
+	"github.com/nextlevelbuilder/goclaw/internal/channels/zalo/common"
 	"github.com/nextlevelbuilder/goclaw/internal/config"
 	"github.com/nextlevelbuilder/goclaw/internal/store"
 )
@@ -62,6 +63,11 @@ type Channel struct {
 	stopOnce sync.Once
 	stopCh   chan struct{}
 	tickerWG sync.WaitGroup
+
+	// webhookRouter is the shared Zalo router for the gateway. Wired by
+	// FactoryWithRouter; nil for callers that still use the legacy Factory.
+	// Phase 05 calls router.RegisterInstance(...) when transport=webhook.
+	webhookRouter *common.Router
 }
 
 // New constructs the channel. InstanceLoader calls SetInstanceID after this.

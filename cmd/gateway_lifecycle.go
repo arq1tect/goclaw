@@ -212,6 +212,15 @@ func (d *gatewayDeps) runLifecycle(
 		slog.Info("webhook route mounted on gateway", "path", route.Path)
 	}
 
+	// Single shared Zalo webhook entry: /channels/zalo/webhook?instance=<uuid>.
+	// Both zalo_bot and zalo_oa instances dispatch through this router by
+	// registering themselves with their per-instance UUID at Start().
+	if d.zaloRouter != nil {
+		const zaloWebhookPath = "/channels/zalo/webhook"
+		mux.Handle(zaloWebhookPath, d.zaloRouter)
+		slog.Info("webhook route mounted on gateway", "path", zaloWebhookPath, "owner", "zalo")
+	}
+
 	tsCleanup := initTailscale(ctx, d.cfg, mux)
 	if tsCleanup != nil {
 		defer tsCleanup()
