@@ -18,18 +18,40 @@ import (
 )
 
 // Router dispatches webhook POSTs to a registered Zalo channel instance.
-// One Router is built at gateway startup and mounted on the mux at
-// /channels/zalo/webhook. Channels register themselves at Start() and
-// unregister at Stop() — there is no central instance lookup table on
-// channels.Manager. Zalo channels deliberately do not implement
-// channels.WebhookChannel because that interface mounts a per-channel
-// path; we want a single-mount, multi-instance router.
+// A process-global Router (see shared.go) is mounted on the mux at
+// WebhookPath via the generic channels.WebhookChannel iteration; both
+// bot.Channel and oa.Channel implement WebhookChannel and call
+// SharedRouter().MountRoute() — the routeHandled flag in MountRoute
+// guarantees a single mount across both channel families. Channels
+// register themselves per-instance at Start() and unregister at Stop().
 type Router struct {
 	mu          sync.RWMutex
 	instances   map[uuid.UUID]*registeredInstance
 	dedup       *Dedup
 	rateLimiter *channels.WebhookRateLimiter
 	maxBodySize int64
+
+	// routeMu guards routeHandled. Separate from `mu` (which guards the
+	// hot-path instance map) because MountRoute is called once per channel
+	// at boot — no need to contend with ServeHTTP's RLock pattern.
+	routeMu      sync.Mutex
+	routeHandled bool
+}
+
+// MountRoute returns (WebhookPath, r) on the first call and ("", nil) on
+// every subsequent call. Pattern mirrors facebook/webhook_router.go and
+// pancake/webhook_handler.go. The routeHandled flag is sticky across
+// instance_loader.Reload — http.ServeMux retains the route across the
+// instance lifecycle, so re-mounting would panic with "multiple
+// registrations".
+func (r *Router) MountRoute() (string, http.Handler) {
+	r.routeMu.Lock()
+	defer r.routeMu.Unlock()
+	if !r.routeHandled {
+		r.routeHandled = true
+		return WebhookPath, r
+	}
+	return "", nil
 }
 
 // emptyIDStreakWarnThreshold is the consecutive count of empty
