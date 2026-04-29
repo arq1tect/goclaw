@@ -14,12 +14,6 @@ import (
 // than crashing instance_loader. Called from Channel.Start when
 // cfg.Transport == "webhook".
 func (c *Channel) startWebhookTransport() error {
-	if c.webhookRouter == nil {
-		c.MarkFailed("webhook router missing",
-			"transport=webhook requires FactoryWithRouter wiring",
-			channels.ChannelFailureKindConfig, false)
-		return nil
-	}
 	mode := normalizeMode(c.cfg.WebhookSignatureMode)
 	if c.cfg.WebhookOASecretKey == "" && mode != SignatureModeDisabled {
 		c.MarkFailed("webhook secret missing",

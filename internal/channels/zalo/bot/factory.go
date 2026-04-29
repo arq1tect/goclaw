@@ -27,26 +27,12 @@ type zaloInstanceConfig struct {
 	BlockReply *bool    `json:"block_reply,omitempty"`
 }
 
-// Factory creates a Zalo Bot channel from DB instance data without a
-// shared webhook router. Kept for back-compat with call sites that don't
-// yet wire the router; new code should prefer FactoryWithRouter.
+// Factory creates a Zalo Bot channel from DB instance data. Webhook-mode
+// channels register with common.SharedRouter() at Start(); tests inject
+// an isolated router via direct field assignment (white-box, same
+// package).
 func Factory(name string, creds json.RawMessage, cfg json.RawMessage,
 	msgBus *bus.MessageBus, pairingSvc store.PairingStore) (channels.Channel, error) {
-	return buildFromInstance(name, creds, cfg, msgBus, pairingSvc, nil)
-}
-
-// FactoryWithRouter is the preferred factory: it threads the shared
-// webhook router into the channel so phases 04+ can register/unregister
-// per-instance webhook handlers at Start()/Stop().
-func FactoryWithRouter(router *common.Router) channels.ChannelFactory {
-	return func(name string, creds json.RawMessage, cfg json.RawMessage,
-		msgBus *bus.MessageBus, pairingSvc store.PairingStore) (channels.Channel, error) {
-		return buildFromInstance(name, creds, cfg, msgBus, pairingSvc, router)
-	}
-}
-
-func buildFromInstance(name string, creds json.RawMessage, cfg json.RawMessage,
-	msgBus *bus.MessageBus, pairingSvc store.PairingStore, router *common.Router) (channels.Channel, error) {
 
 	var c zaloCreds
 	if len(creds) > 0 {
@@ -81,7 +67,7 @@ func buildFromInstance(name string, creds json.RawMessage, cfg json.RawMessage,
 	if err != nil {
 		return nil, err
 	}
-	ch.webhookRouter = router
+	ch.webhookRouter = common.SharedRouter()
 	ch.SetName(name)
 	return ch, nil
 }

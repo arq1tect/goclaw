@@ -13,20 +13,10 @@ import (
 )
 
 // Factory returns a channels.ChannelFactory closure that captures the
-// store dependency. Kept for back-compat with call sites that don't yet
-// thread the shared webhook router; new code should prefer FactoryWithRouter.
+// store dependency. Webhook-mode channels register with
+// common.SharedRouter() at Start(); tests inject an isolated router via
+// direct field assignment (white-box, same package).
 func Factory(ciStore store.ChannelInstanceStore) channels.ChannelFactory {
-	return factoryWith(ciStore, nil)
-}
-
-// FactoryWithRouter is the preferred factory: it threads the shared
-// webhook router into the channel so phases 05+ can register/unregister
-// per-instance webhook handlers at Start()/Stop().
-func FactoryWithRouter(ciStore store.ChannelInstanceStore, router *common.Router) channels.ChannelFactory {
-	return factoryWith(ciStore, router)
-}
-
-func factoryWith(ciStore store.ChannelInstanceStore, router *common.Router) channels.ChannelFactory {
 	return func(name string, credsRaw json.RawMessage, cfgRaw json.RawMessage,
 		msgBus *bus.MessageBus, pairingSvc store.PairingStore) (channels.Channel, error) {
 
@@ -50,7 +40,7 @@ func factoryWith(ciStore store.ChannelInstanceStore, router *common.Router) chan
 		if err != nil {
 			return nil, err
 		}
-		ch.webhookRouter = router
+		ch.webhookRouter = common.SharedRouter()
 		// Seed the in-memory poll cursor from any persisted state in
 		// channel_instances.config.poll_cursor (phase-04 persistence).
 		if seeded := parseCursorFromConfig(cfgRaw); len(seeded) > 0 {

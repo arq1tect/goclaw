@@ -28,7 +28,6 @@ import (
 	"github.com/nextlevelbuilder/goclaw/internal/channels/telegram"
 	"github.com/nextlevelbuilder/goclaw/internal/channels/whatsapp"
 	zalobot "github.com/nextlevelbuilder/goclaw/internal/channels/zalo/bot"
-	zalocommon "github.com/nextlevelbuilder/goclaw/internal/channels/zalo/common"
 	zalooa "github.com/nextlevelbuilder/goclaw/internal/channels/zalo/oa"
 	zalopersonal "github.com/nextlevelbuilder/goclaw/internal/channels/zalo/personal"
 	"github.com/nextlevelbuilder/goclaw/internal/config"
@@ -430,12 +429,6 @@ func runGateway() {
 	channelMgr := channels.NewManager(msgBus)
 	deps.channelMgr = channelMgr
 
-	// Single shared Zalo webhook router (zalo_bot + zalo_oa). Mounted on
-	// the mux later in gateway_lifecycle.go; channels register themselves
-	// at Start() with their UUID and a per-channel WebhookHandler.
-	zaloRouter := zalocommon.NewRouter()
-	deps.zaloRouter = zaloRouter
-
 	// Wire channel member resolver into permission grant paths (WS + HTTP) so
 	// file_writer grants coming from the Web UI auto-enrich their metadata.
 	cfgPermsMethods.SetMemberResolver(channelMgr)
@@ -468,8 +461,8 @@ func runGateway() {
 		instanceLoader.RegisterFactory(channels.TypeTelegram, telegram.FactoryWithStoresAndAudio(pgStores.Agents, pgStores.ConfigPermissions, pgStores.Teams, pgStores.SubagentTasks, pgStores.PendingMessages, audioMgr))
 		instanceLoader.RegisterFactory(channels.TypeDiscord, discord.FactoryWithStoresAndAudio(pgStores.Agents, pgStores.ConfigPermissions, pgStores.PendingMessages, audioMgr))
 		instanceLoader.RegisterFactory(channels.TypeFeishu, feishu.FactoryWithPendingStoreAndAudio(pgStores.PendingMessages, audioMgr))
-		instanceLoader.RegisterFactory(channels.TypeZaloBot, zalobot.FactoryWithRouter(zaloRouter))
-		instanceLoader.RegisterFactory(channels.TypeZaloOA, zalooa.FactoryWithRouter(pgStores.ChannelInstances, zaloRouter))
+		instanceLoader.RegisterFactory(channels.TypeZaloBot, zalobot.Factory)
+		instanceLoader.RegisterFactory(channels.TypeZaloOA, zalooa.Factory(pgStores.ChannelInstances))
 		instanceLoader.RegisterFactory(channels.TypeZaloPersonal, zalopersonal.FactoryWithPendingStore(pgStores.PendingMessages))
 		instanceLoader.RegisterFactory(channels.TypeWhatsApp, whatsapp.FactoryWithDBAudio(pgStores.DB, pgStores.PendingMessages, "pgx", audioMgr, pgStores.BuiltinTools))
 		instanceLoader.RegisterFactory(channels.TypeSlack, slackchannel.FactoryWithPendingStore(pgStores.PendingMessages))

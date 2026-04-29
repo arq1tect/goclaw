@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/nextlevelbuilder/goclaw/internal/channels"
+	"github.com/nextlevelbuilder/goclaw/internal/channels/zalo/common"
 	"github.com/nextlevelbuilder/goclaw/internal/gateway"
 	"github.com/nextlevelbuilder/goclaw/internal/i18n"
 	"github.com/nextlevelbuilder/goclaw/internal/store"
@@ -61,7 +62,7 @@ func (m *ZaloWebhookMethods) handleWebhookURL(ctx context.Context, client *gatew
 		return
 	}
 
-	path := fmt.Sprintf("/channels/zalo/webhook?instance=%s", instID)
+	path := fmt.Sprintf("%s?instance=%s", common.WebhookPath, instID)
 	client.SendResponse(protocol.NewOKResponse(req.ID, map[string]any{
 		"path":        path,
 		"instance_id": instID.String(),
