@@ -20,6 +20,22 @@ export interface FieldDef {
   generatable?: boolean;
 }
 
+// Resolves a field's `showWhen` against current values. Used by the renderer
+// to hide fields and by the form submit to skip required-field checks for
+// hidden fields (e.g. webhook_path is required but only when transport=webhook).
+export function isFieldVisible(
+  field: FieldDef,
+  schema: FieldDef[],
+  values: Record<string, unknown>,
+): boolean {
+  if (!field.showWhen) return true;
+  const dep = values[field.showWhen.key] ?? schema.find((f) => f.key === field.showWhen!.key)?.defaultValue;
+  const depStr = dep !== undefined && dep !== null ? String(dep) : "";
+  return Array.isArray(field.showWhen.value)
+    ? field.showWhen.value.includes(depStr)
+    : depStr === field.showWhen.value;
+}
+
 // --- Shared option lists ---
 
 const blockReplyOptions = [

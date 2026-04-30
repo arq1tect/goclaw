@@ -18,7 +18,7 @@ import { ToolNameSelect } from "@/components/shared/tool-name-select";
 import { SkillNameSelect } from "@/components/shared/skill-name-select";
 import { generateSecret } from "@/lib/generate-secret";
 import { toast } from "@/stores/use-toast-store";
-import type { FieldDef } from "./channel-schemas";
+import { isFieldVisible, type FieldDef } from "./channel-schemas";
 
 const INHERIT = "__inherit__";
 
@@ -37,15 +37,7 @@ export function ChannelFields({ fields, values, onChange, idPrefix, isEdit, cont
   return (
     <div className="grid gap-3">
       {fields.map((field) => {
-        // Conditional visibility: skip field if showWhen condition is not met
-        if (field.showWhen) {
-          const depValue = allValues[field.showWhen.key] ?? fields.find((f) => f.key === field.showWhen!.key)?.defaultValue;
-          const depStr = depValue !== undefined && depValue !== null ? String(depValue) : "";
-          const match = Array.isArray(field.showWhen.value)
-            ? field.showWhen.value.includes(depStr)
-            : depStr === field.showWhen.value;
-          if (!match) return null;
-        }
+        if (!isFieldVisible(field, fields, allValues)) return null;
         // Check disabledWhen condition
         let disabled = false;
         let disabledHint: string | undefined;

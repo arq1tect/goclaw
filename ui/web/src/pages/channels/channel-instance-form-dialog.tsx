@@ -12,7 +12,7 @@ import {
 import { Button } from "@/components/ui/button";
 import type { ChannelInstanceData, ChannelInstanceInput } from "./hooks/use-channel-instances";
 import type { AgentData } from "@/types/agent";
-import { credentialsSchema, configSchema, wizardConfig, type FieldDef } from "./channel-schemas";
+import { credentialsSchema, configSchema, isFieldVisible, wizardConfig, type FieldDef } from "./channel-schemas";
 import { wizardAuthSteps, wizardConfigSteps } from "./channel-wizard-registry";
 import { CHANNEL_TYPES } from "@/constants/channels";
 import { channelInstanceSchema, type ChannelInstanceFormData } from "@/schemas/channel.schema";
@@ -174,7 +174,11 @@ export function ChannelInstanceFormDialog({
   const handleSubmit = form.handleSubmit(async (values) => {
     if (!instance) {
       const schema = credentialsSchema[values.channelType] ?? [];
-      const missing = schema.filter((f: FieldDef) => f.required && !credsValues[f.key]);
+      // Cross-schema visibility: credential showWhen often depends on config keys (e.g. transport).
+      const credsContext = { ...configValues, ...credsValues };
+      const missing = schema.filter(
+        (f: FieldDef) => f.required && isFieldVisible(f, schema, credsContext) && !credsValues[f.key],
+      );
       if (missing.length > 0) {
         setError(t("form.errors.requiredFields", { fields: missing.map((f: FieldDef) => f.label).join(", ") }));
         return;
@@ -190,7 +194,10 @@ export function ChannelInstanceFormDialog({
     if (!instance) {
       const cfgSchema = configSchema[values.channelType] ?? [];
       const missingCfg = cfgSchema.filter(
-        (f: FieldDef) => f.required && (cleanConfig[f.key] === undefined || cleanConfig[f.key] === "" || cleanConfig[f.key] === null),
+        (f: FieldDef) =>
+          f.required &&
+          isFieldVisible(f, cfgSchema, configValues) &&
+          (cleanConfig[f.key] === undefined || cleanConfig[f.key] === "" || cleanConfig[f.key] === null),
       );
       if (missingCfg.length > 0) {
         setError(t("form.errors.requiredFields", { fields: missingCfg.map((f: FieldDef) => f.label).join(", ") }));
