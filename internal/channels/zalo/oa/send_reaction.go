@@ -7,14 +7,16 @@ import (
 	"log/slog"
 )
 
-// react_icon codes per Zalo OA v2.0 doc. /-remove is the retract sentinel.
+// react_icon codes per Zalo OA v2.0 doc, in the order the Zalo client
+// renders them in the reaction picker (haha → worry → cry → like → heart
+// → angry → wow). /-remove is the retract sentinel, not a picker entry.
 const (
-	reactionIconSmile  = ":>"
-	reactionIconThumb  = "--b"
-	reactionIconSad    = ":-(("
-	reactionIconStrong = "/-strong"
+	reactionIconHaha   = ":>"
+	reactionIconWorry  = "--b"
+	reactionIconCry    = ":-(("
+	reactionIconLike   = "/-strong"
 	reactionIconHeart  = "/-heart"
-	reactionIconWave   = ":-h"
+	reactionIconAngry  = ":-h"
 	reactionIconWow    = ":o"
 	reactionIconRemove = "/-remove"
 )
@@ -22,13 +24,13 @@ const (
 // /-remove omitted: it's a control sentinel, not a status emoji the
 // controller may resolve to.
 var zaloSupportedReactions = map[string]bool{
-	reactionIconSmile:  true,
-	reactionIconThumb:  true,
-	reactionIconSad:    true,
-	reactionIconStrong: true,
-	reactionIconHeart:  true,
-	reactionIconWave:   true,
-	reactionIconWow:    true,
+	reactionIconHaha:  true,
+	reactionIconWorry: true,
+	reactionIconCry:   true,
+	reactionIconLike:  true,
+	reactionIconHeart: true,
+	reactionIconAngry: true,
+	reactionIconWow:   true,
 }
 
 func buildReactionBody(userID, sourceMessageID, reactIcon string) map[string]any {

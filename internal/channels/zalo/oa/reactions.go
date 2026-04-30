@@ -13,10 +13,13 @@ const reactionDebounceMs = 700 * time.Millisecond
 // first intermediate event plus a warm/sad terminal. tool/coding/web are
 // intentionally NOT mapped — chatty mid-run reactions look unprofessional
 // in customer chats and burn through the 50-per-message cap.
+//
+// Angry (`:-h`) is intentionally excluded — dropping an angry face on the
+// customer's own message reads as blaming them, even on agent-side errors.
 var statusReactionVariants = map[string][]string{
-	"thinking": {reactionIconThumb, reactionIconSmile},
-	"done":     {reactionIconHeart, reactionIconThumb},
-	"error":    {reactionIconSad, reactionIconStrong},
+	"thinking": {reactionIconLike, reactionIconHeart},
+	"done":     {reactionIconHeart, reactionIconLike},
+	"error":    {reactionIconWorry, reactionIconCry},
 }
 
 func resolveReactionEmoji(status string) string {

@@ -110,7 +110,9 @@ Set `reaction_level` in the channel config to surface agent run progress as a Za
 
 - `off` (**default**) — no reactions sent. Existing tenants stay silent on upgrade.
 - `minimal` (**recommended for production**) — terminal-only: `/-heart` on success, `:-((` on failure. Exactly 0–2 reactions per agent run; doesn't pollute the customer's chat with mid-flight noise.
-- `full` — adds a single "received, working on it" `--b` (thumbs-up) on the first intermediate event, debounced to ≤1 call per 700 ms. Mid-run tool/coding/web statuses are intentionally NOT mapped on Zalo OA — chatty intermediate reactions on a customer support conversation feel unprofessional and eat into the 50-reaction-per-`message_id` cap. If you need the full Telegram-style transition set, extend `statusReactionVariants` in `internal/channels/zalo/oa/reactions.go`.
+- `full` — adds a single "received, working on it" `/-strong` (thumbs-up / like) on the first intermediate event, debounced to ≤1 call per 700 ms. Mid-run tool/coding/web statuses are intentionally NOT mapped on Zalo OA — chatty intermediate reactions on a customer support conversation feel unprofessional and eat into the 50-reaction-per-`message_id` cap. If you need the full Telegram-style transition set, extend `statusReactionVariants` in `internal/channels/zalo/oa/reactions.go`.
+
+The picker order in the Zalo client (haha → worry → cry → like → heart → angry → wow) maps to wire codes `:>`, `--b`, `:-((`, `/-strong`, `/-heart`, `:-h`, `:o`. `:-h` (angry) is intentionally not used by any status — dropping an angry face on the customer's own message reads as blaming them.
 
 Zalo OA caps reactions at 50 per source `message_id`. The endpoint (`POST /v2.0/oa/message`) does NOT count against the OA monthly active-message quota. Reactions are best-effort: failures are logged at Debug and never flip channel health. `ClearReaction` sends the `/-remove` sentinel to retract a previously dropped reaction (Zalo has no separate clear endpoint).
 

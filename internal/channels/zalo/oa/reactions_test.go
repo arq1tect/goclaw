@@ -118,8 +118,8 @@ func TestResolveReactionEmoji_FallbackOnUnsupported(t *testing.T) {
 		zaloSupportedReactions = orig
 	})
 
-	// Drop the primary variant for "thinking" (currently :o) and confirm
-	// the resolver advances to the fallback.
+	// Drop the primary variant for "thinking" and confirm the resolver
+	// advances to the fallback.
 	primary := statusReactionVariants["thinking"][0]
 	zaloSupportedReactions = map[string]bool{}
 	for k, v := range orig {
