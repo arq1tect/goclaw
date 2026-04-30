@@ -108,7 +108,8 @@ func TestResolveReactionEmoji_AllStatusesProduceIcon(t *testing.T) {
 }
 
 func TestResolveReactionEmoji_FallbackOnUnsupported(t *testing.T) {
-	t.Parallel()
+	// Mutates the package-global zaloSupportedReactions; can't run in parallel
+	// with tests that resolve reactions.
 	// Snapshot + restore the supported set so we can shrink it for one test.
 	orig := make(map[string]bool, len(zaloSupportedReactions))
 	for k, v := range zaloSupportedReactions {
