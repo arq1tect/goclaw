@@ -117,8 +117,8 @@ func (v *oaSignatureVerifier) Verify(headers http.Header, body []byte) error {
 	}
 	if subtle.ConstantTimeCompare([]byte(sig), []byte(expected)) != 1 {
 		if v.mode == SignatureModeLogOnly {
-			slog.Warn("security.zalo_oa_webhook_sig_mismatch_log_only",
-				"got", sig, "want_prefix", expected[:8]+"...")
+			// Never log any part of `expected` — it's secret-keyed.
+			slog.Warn("security.zalo_oa_webhook_sig_mismatch_log_only", "got", sig)
 			return nil
 		}
 		return common.ErrSignatureMismatch

@@ -116,6 +116,9 @@ func NewRouter() *Router {
 // another channel already owns the slug. The per-instance ctx is cancelled
 // by UnregisterInstance so dispatch goroutines bail promptly.
 func (r *Router) RegisterInstance(id uuid.UUID, h WebhookHandler, tenantID uuid.UUID, slug string) error {
+	if id == uuid.Nil {
+		return fmt.Errorf("zalo_common: register requires non-nil instance id")
+	}
 	if err := ValidateSlug(slug); err != nil {
 		return err
 	}
@@ -186,6 +189,24 @@ func (r *Router) lookupBySlug(slug string) (uuid.UUID, *registeredInstance, bool
 	return id, inst, ok
 }
 
+// reserveDispatchSlot does lookup + dispatchWG.Add(1) atomically under RLock.
+// UnregisterInstance takes the write lock before Wait, so this prevents the
+// "WaitGroup reused before previous Wait returned" race during reload.
+func (r *Router) reserveDispatchSlot(slug string) (uuid.UUID, *registeredInstance, bool) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	id, ok := r.slugToInstance[slug]
+	if !ok {
+		return uuid.Nil, nil, false
+	}
+	inst, ok := r.instances[id]
+	if !ok {
+		return uuid.Nil, nil, false
+	}
+	inst.dispatchWG.Add(1)
+	return id, inst, true
+}
+
 // ServeHTTP returns 200 once dispatch reaches the handler — Zalo retries
 // hard on non-2xx, so handler errors are logged, not surfaced. Pre-dispatch
 // failures (auth, rate limit, parse) return 4xx for operator visibility.
@@ -254,7 +275,11 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		}
 	}
 
-	inst.dispatchWG.Add(1)
+	resolvedID, resolvedInst, ok := r.reserveDispatchSlot(suffix)
+	if !ok || resolvedID != instanceID || resolvedInst != inst {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
 	go r.dispatch(instanceID, inst, body)
 	w.WriteHeader(http.StatusOK)
 }

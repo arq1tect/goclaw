@@ -333,12 +333,14 @@ func TestClassifyRefreshError(t *testing.T) {
 		wantAuth bool
 	}{
 		{"invalid_grant envelope", &APIError{Code: -118, Message: "invalid_grant"}, true},
-		{"expired envelope", &APIError{Code: -123, Message: "refresh token expired"}, true},
 		{"transient 5xx", errors.New("http 503"), false},
 		{"transient timeout", errors.New("http: read timeout"), false},
 		{"nil", nil, false},
-		// Below: must NOT escalate. Generic "invalid X" indicates config error
-		// or transient validation issue, not refresh-token death.
+		// Below: must NOT escalate. Only the language-independent -118 code
+		// signals refresh-token death. Localized server messages containing
+		// "expired" or "invalid" must stay transient — substring matching
+		// would falsely force re-consent on FamilyServer 10000 in Vietnamese.
+		{"server with localized expired", &APIError{Code: 10000, Message: "Hết hạn (expired)"}, false},
 		{"invalid app_id (config bug)", &APIError{Code: -1, Message: "invalid app_id"}, false},
 		{"invalid parameter", &APIError{Code: -2, Message: "invalid parameter"}, false},
 	}
