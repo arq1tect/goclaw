@@ -480,6 +480,17 @@ func (c *BaseChannel) MarkDegraded(summary, detail string, kind ChannelFailureKi
 	c.setHealth(NewChannelHealth(ChannelHealthStateDegraded, summary, detail, kind, retryable))
 }
 
+// MarkBootstrap records a degraded state that's part of normal setup
+// (not a fault). The bootstrap_state field is locale-independent.
+func (c *BaseChannel) MarkBootstrap(state ChannelBootstrapState, summary, detail string, kind ChannelFailureKind, retryable bool) {
+	if summary == "" {
+		summary = "Setup incomplete"
+	}
+	h := NewChannelHealth(ChannelHealthStateDegraded, summary, detail, kind, retryable)
+	h.BootstrapState = state
+	c.setHealth(h)
+}
+
 // MarkFailed records a startup or runtime failure.
 func (c *BaseChannel) MarkFailed(summary, detail string, kind ChannelFailureKind, retryable bool) {
 	if summary == "" {

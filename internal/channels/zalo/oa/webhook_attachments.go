@@ -48,7 +48,9 @@ func firstAttachment(atts []oaAttachment) *oaAttachment {
 // dispatchWebhookMedia downloads the attachment URL and forwards it as a
 // MediaInfo-tagged inbound. forceImageKind classifies stickers/gifs as
 // image regardless of detected MIME so the agent treats them visually.
-func (c *Channel) dispatchWebhookMedia(e *oaInboundEvent, forceImageKind bool) {
+// The parent ctx (router's inst.ctx) cancels on UnregisterInstance, so
+// downloads are aborted on Stop and Unregister can drain dispatchWG.
+func (c *Channel) dispatchWebhookMedia(parent context.Context, e *oaInboundEvent, forceImageKind bool) {
 	if e.Sender.ID == "" {
 		return
 	}
@@ -59,7 +61,7 @@ func (c *Channel) dispatchWebhookMedia(e *oaInboundEvent, forceImageKind bool) {
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	ctx, cancel := context.WithTimeout(parent, 60*time.Second)
 	defer cancel()
 	path, err := downloadOAMediaFn(ctx, url)
 	if err != nil {

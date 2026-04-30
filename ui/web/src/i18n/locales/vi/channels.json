@@ -126,6 +126,8 @@
       "urlLabel": "URL Webhook (dán vào Zalo console)",
       "hostLabel": "Host gateway",
       "hostHint": "Ghi đè host gateway nếu Zalo không thể truy cập origin của UI này. Lưu cục bộ trên trình duyệt.",
+      "hostInvalid": "Host không phải là URL hợp lệ",
+      "hostInvalidScheme": "Host phải bắt đầu bằng http:// hoặc https://",
       "oaIdLabel": "OA ID",
       "oaIdPlaceholder": "Tự động phát hiện sau khi Kết nối",
       "loading": "Đang tải...",

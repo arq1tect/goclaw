@@ -33,20 +33,21 @@ func (c *Channel) startWebhookTransport() error {
 	c.resolvedSlug = slug
 
 	if c.inBootstrap() {
-		c.MarkDegraded(
+		c.MarkBootstrap(
+			channels.ChannelBootstrapAwaitingSecret,
 			"awaiting webhook secret",
 			"Zalo OA Secret Key not yet pasted. Webhook acks URL-verification ping with HTTP 200 but drops events. Paste Khóa bí mật OA in Credentials tab to enable signature verification.",
 			channels.ChannelFailureKindConfig,
 			true,
 		)
 		slog.Info("zalo_oa.webhook.bootstrap_active",
-			"instance_id", c.instanceID, "oa_id", c.creds.OAID, "slug", slug)
+			"instance_id", c.instanceID, "oa_id", c.creds().OAID, "slug", slug)
 		return nil
 	}
 
 	mode := normalizeMode(c.cfg.WebhookSignatureMode)
 	slog.Info("zalo_oa.webhook.registered",
-		"instance_id", c.instanceID, "oa_id", c.creds.OAID, "signature_mode", mode, "slug", slug)
+		"instance_id", c.instanceID, "oa_id", c.creds().OAID, "signature_mode", mode, "slug", slug)
 
 	if c.cfg.CatchUpOnRestart {
 		c.catchUpWG.Add(1)

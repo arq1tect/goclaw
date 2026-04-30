@@ -82,7 +82,7 @@ func (c *Channel) pollOnce(ctx context.Context) error {
 		}
 		if page == maxPages-1 {
 			slog.Warn("zalo_oa.poll.burndown_capped",
-				"oa_id", c.creds.OAID,
+				"oa_id", c.creds().OAID,
 				"max_pages", maxPages,
 				"page_size", pageSize,
 				"hint", "raise poll_burndown_max_pages, shorten poll_interval_seconds, or switch to webhook transport")
@@ -101,7 +101,7 @@ func (c *Channel) listRecentChatRetryAuth(ctx context.Context, offset, count int
 	var apiErr *APIError
 	if errors.As(err, &apiErr) && apiErr.isAuth() {
 		slog.Warn("zalo_oa.poll.token_rejected_forcing_refresh",
-			"oa_id", c.creds.OAID, "zalo_code", apiErr.Code, "zalo_msg", apiErr.Message)
+			"oa_id", c.creds().OAID, "zalo_code", apiErr.Code, "zalo_msg", apiErr.Message)
 		c.tokens.ForceRefresh()
 		return c.listRecentChat(ctx, offset, count)
 	}
@@ -116,7 +116,7 @@ func (c *Channel) processMessages(msgs []message) {
 	sort.SliceStable(msgs, func(i, j int) bool { return msgs[i].Time < msgs[j].Time })
 
 	for _, m := range msgs {
-		if m.FromID == "" || m.FromID == c.creds.OAID {
+		if m.FromID == "" || m.FromID == c.creds().OAID {
 			continue
 		}
 		if m.Time == 0 && m.MessageID == "" {
@@ -144,7 +144,7 @@ func (c *Channel) processMessages(msgs []message) {
 func (c *Channel) dispatchInbound(m message) {
 	if m.Type != "" && m.Type != "text" {
 		slog.Info("zalo_oa.poll.non_text_skipped",
-			"oa_id", c.creds.OAID, "user_id", m.FromID, "message_id", m.MessageID, "type", m.Type)
+			"oa_id", c.creds().OAID, "user_id", m.FromID, "message_id", m.MessageID, "type", m.Type)
 		return
 	}
 	if m.Text == "" {

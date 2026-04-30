@@ -152,12 +152,13 @@ func newTokenSourceForTest(t *testing.T, srvURL string, expiresAt time.Time, fs 
 	}
 	client := NewClient(5 * time.Second)
 	client.oauthBase = srvURL
-	return &tokenSource{
+	ts := &tokenSource{
 		client:     client,
-		creds:      creds,
 		store:      fs,
 		instanceID: uuid.New(),
 	}
+	ts.creds.Store(creds)
+	return ts
 }
 
 func TestAccess_FreshTokenSkipsRefresh(t *testing.T) {
@@ -221,7 +222,7 @@ func TestAccess_PropagatesRefreshTokenExpiry(t *testing.T) {
 	if _, err := ts.Access(context.Background()); err != nil {
 		t.Fatalf("Access: %v", err)
 	}
-	got := ts.creds.RefreshTokenExpiresAt
+	got := ts.Snapshot().RefreshTokenExpiresAt
 	if got.IsZero() {
 		t.Fatal("RefreshTokenExpiresAt is zero, expected ~90d ahead")
 	}

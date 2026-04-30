@@ -109,6 +109,7 @@ func (c *Channel) handleTextMessage(msg *zaloMessage) {
 		SenderDisplayName: msg.From.Username,
 	}.ToMap()
 
+	c.startTyping(chatID)
 	c.HandleMessage(senderID, chatID, content, nil, metadata, "direct")
 }
 
@@ -168,5 +169,6 @@ func (c *Channel) handleImageMessage(msg *zaloMessage) {
 		SenderDisplayName: msg.From.Username,
 	}.ToMap()
 
+	c.startTyping(chatID)
 	c.HandleMessage(senderID, chatID, content, media, metadata, "direct")
 }

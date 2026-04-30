@@ -54,7 +54,7 @@ func (c *Channel) runPollLoop(parentCtx context.Context) {
 					rateLimited = true
 				}
 			case err != nil:
-				slog.Warn("zalo_oa.poll_failed", "oa_id", c.creds.OAID, "error", err)
+				slog.Warn("zalo_oa.poll_failed", "oa_id", c.creds().OAID, "error", err)
 				// Auth errors after pollOnce's retry-once-on-auth mean the
 				// operator must re-consent.
 				c.markAuthFailedIfNeeded(err)

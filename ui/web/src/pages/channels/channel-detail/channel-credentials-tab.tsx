@@ -62,12 +62,10 @@ export function ChannelCredentialsTab({ instance, status, onUpdate }: ChannelCre
     setValues(initialCredsValues(fields, instance.credentials));
   }, [fields, instance.credentials]);
 
-  // Substring-match the backend's degraded summary; avoids a dedicated wire field.
   const isZaloOABootstrap =
     instance.channel_type === "zalo_oa" &&
     status?.state === "degraded" &&
-    typeof status.summary === "string" &&
-    status.summary.toLowerCase().includes("awaiting webhook secret");
+    status?.bootstrap_state === "awaiting_secret";
 
   const handleChange = useCallback((key: string, value: unknown) => {
     setValues((prev) => ({ ...prev, [key]: value }));

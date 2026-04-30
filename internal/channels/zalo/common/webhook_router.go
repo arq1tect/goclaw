@@ -269,10 +269,6 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		}
 	} else {
 		inst.emptyIDStreak.Store(0)
-		if r.dedup.SeenOrAdd(instanceID, mid) {
-			w.WriteHeader(http.StatusOK)
-			return
-		}
 	}
 
 	resolvedID, resolvedInst, ok := r.reserveDispatchSlot(suffix)
@@ -283,6 +279,13 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			"verified_instance_id", instanceID,
 			"resolved_instance_id", resolvedID,
 			"resolved_ok", ok)
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+	// Admit to dedup AFTER the dispatch slot is reserved so reload-dropped
+	// requests don't waste TTL slots keyed by a stale instanceID.
+	if mid != "" && r.dedup.SeenOrAdd(instanceID, mid) {
+		inst.dispatchWG.Done()
 		w.WriteHeader(http.StatusOK)
 		return
 	}

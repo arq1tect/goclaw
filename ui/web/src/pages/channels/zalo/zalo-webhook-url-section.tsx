@@ -32,6 +32,25 @@ export function ZaloWebhookURLSection({ instanceId, channelType }: ZaloWebhookUR
   const [data, setData] = useState<WebhookURLResp | null>(null);
   const [copied, setCopied] = useState(false);
   const [host, setHost] = useWebhookHost();
+  const [hostError, setHostError] = useState<string | null>(null);
+
+  function validateHost(value: string) {
+    const trimmed = value.trim();
+    if (!trimmed) {
+      setHostError(null);
+      return;
+    }
+    try {
+      const u = new URL(trimmed);
+      if (u.protocol !== "http:" && u.protocol !== "https:") {
+        setHostError(t("detail.zaloWebhook.hostInvalidScheme", { defaultValue: "Host must be http(s)://" }));
+        return;
+      }
+      setHostError(null);
+    } catch {
+      setHostError(t("detail.zaloWebhook.hostInvalid", { defaultValue: "Host is not a valid URL" }));
+    }
+  }
 
   useEffect(() => {
     if (!instanceId) return;
@@ -74,9 +93,13 @@ export function ZaloWebhookURLSection({ instanceId, channelType }: ZaloWebhookUR
           id="cd-webhook-host"
           value={host}
           onChange={(e) => setHost(e.target.value)}
+          onBlur={(e) => validateHost(e.target.value)}
           placeholder="https://gw.example.com"
           className="text-base md:text-sm font-mono"
         />
+        {hostError && (
+          <p className="text-xs text-destructive">{hostError}</p>
+        )}
         <p className="text-xs text-muted-foreground">
           {t("detail.zaloWebhook.hostHint", {
             defaultValue: "Override the gateway host if Zalo cannot reach this UI's origin. Stored locally per-browser.",

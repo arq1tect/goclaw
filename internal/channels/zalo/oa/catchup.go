@@ -36,7 +36,7 @@ func (c *Channel) runCatchUpSweep(parentCtx context.Context) {
 
 	dispatched := 0
 	for _, m := range msgs {
-		if m.FromID == "" || m.FromID == c.creds.OAID {
+		if m.FromID == "" || m.FromID == c.creds().OAID {
 			continue
 		}
 		if m.Time != 0 {

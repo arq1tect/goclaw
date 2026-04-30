@@ -16,6 +16,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/nextlevelbuilder/goclaw/internal/bus"
+	"github.com/nextlevelbuilder/goclaw/internal/channels"
 	"github.com/nextlevelbuilder/goclaw/internal/channels/zalo/common"
 	"github.com/nextlevelbuilder/goclaw/internal/config"
 )
@@ -439,8 +440,8 @@ func TestStart_WebhookMissingSecretEntersBootstrap(t *testing.T) {
 	if string(snap.State) != "degraded" {
 		t.Errorf("State = %v, want degraded", snap.State)
 	}
-	if !strings.Contains(strings.ToLower(snap.Summary), "awaiting webhook secret") {
-		t.Errorf("Summary = %q, want contains 'awaiting webhook secret'", snap.Summary)
+	if snap.BootstrapState != channels.ChannelBootstrapAwaitingSecret {
+		t.Errorf("BootstrapState = %q, want %q", snap.BootstrapState, channels.ChannelBootstrapAwaitingSecret)
 	}
 	if c.ResolvedWebhookSlug() == "" {
 		t.Error("slug not registered in bootstrap")

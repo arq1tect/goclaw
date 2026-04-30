@@ -157,12 +157,14 @@ func (v *oaSignatureVerifier) checkReplayWindow(tsInt int64) error {
 	}
 	skew := time.Since(eventTime)
 	if skew > v.replayWindow || skew < -v.replayWindow {
-		err := fmt.Errorf("event timestamp outside replay window: skew=%v, window=±%v", skew, v.replayWindow)
 		if v.mode == SignatureModeLogOnly {
-			slog.Warn("security.zalo_oa_webhook_replay_log_only", "err", err)
+			// Don't log skew direction/magnitude — it's a clock-skew oracle
+			// for a probing attacker.
+			slog.Warn("security.zalo_oa_webhook_replay_log_only",
+				"reason", "outside replay window")
 			return nil
 		}
-		return err
+		return fmt.Errorf("event timestamp outside replay window: skew=%v, window=±%v", skew, v.replayWindow)
 	}
 	return nil
 }

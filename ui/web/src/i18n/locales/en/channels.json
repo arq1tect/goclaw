@@ -126,6 +126,8 @@
       "urlLabel": "Webhook URL (paste into Zalo console)",
       "hostLabel": "Gateway host",
       "hostHint": "Override the gateway host if Zalo cannot reach this UI's origin. Stored locally per-browser.",
+      "hostInvalid": "Host is not a valid URL",
+      "hostInvalidScheme": "Host must start with http:// or https://",
       "oaIdLabel": "OA ID",
       "oaIdPlaceholder": "Auto-discovered after Connect",
       "loading": "Loading...",

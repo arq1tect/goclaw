@@ -126,6 +126,8 @@
       "urlLabel": "Webhook URL（粘贴到 Zalo 控制台）",
       "hostLabel": "网关主机",
       "hostHint": "如果 Zalo 无法访问此 UI 的源地址，请覆盖网关主机。按浏览器本地存储。",
+      "hostInvalid": "主机不是有效的 URL",
+      "hostInvalidScheme": "主机必须以 http:// 或 https:// 开头",
       "oaIdLabel": "OA ID",
       "oaIdPlaceholder": "连接后自动发现",
       "loading": "加载中...",
@@ -156,8 +158,8 @@
       "bootstrapBanner": {
         "title": "引导模式：在 Zalo 完成设置",
         "step1": "复制下方的 Webhook URL。",
-        "step2": "在 developers.zalo.me 的 Webhook 标签页粘贴 URL → 点击 Thay đổi → Cập nhật。Zalo 验证并保存。",
-        "step3": "Khóa bí mật OA 字段出现。点击眼睛图标显示并复制该值。",
+        "step2": "在 developers.zalo.me 的 Webhook 标签页粘贴 URL → 点击 Thay đổi（更改）→ Cập nhật（更新）。Zalo 验证并保存。",
+        "step3": "Khóa bí mật OA（OA 密钥）字段出现。点击眼睛图标显示并复制该值。",
         "step4": "将密钥粘贴到下方的 Webhook Secret Key 字段 → 更新凭据。",
         "note": "处于引导模式时，Channel 会以 200 应答 Zalo 的验证 ping，但会丢弃事件。粘贴密钥后将启用签名校验和消息处理。"
       }

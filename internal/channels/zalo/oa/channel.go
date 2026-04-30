@@ -43,7 +43,6 @@ type Channel struct {
 	*channels.BaseChannel
 
 	client  *Client
-	creds   *ChannelCreds
 	ciStore store.ChannelInstanceStore
 	cfg     config.ZaloOAConfig
 
@@ -68,14 +67,23 @@ type Channel struct {
 
 	bootstrapDroppedCount atomic.Int64
 
-	reactions sync.Map // key: "<userID>:<sourceMessageID>" → *zaloReactionController
+	reactions       sync.Map // key: "<userID>:<sourceMessageID>" → *zaloReactionController
+	reactionWG      sync.WaitGroup
+	reactionCtx     context.Context
+	reactionCancel  context.CancelFunc
+}
+
+// creds returns a read-only snapshot. Refresh swaps the pointer atomically;
+// callers must not mutate the returned struct.
+func (c *Channel) creds() *ChannelCreds {
+	return c.tokens.Snapshot()
 }
 
 // inBootstrap: webhook + signature-enforcing + no secret yet. Acks Zalo's
 // URL-save ping so the operator can register the URL and retrieve the OA
 // Secret Key from the dev console.
 func (c *Channel) inBootstrap() bool {
-	return c.creds.WebhookSecretKey == "" &&
+	return c.creds().WebhookSecretKey == "" &&
 		normalizeMode(c.cfg.WebhookSignatureMode) != SignatureModeDisabled
 }
 
@@ -93,7 +101,6 @@ func New(name string, cfg config.ZaloOAConfig, creds *ChannelCreds,
 	c := &Channel{
 		BaseChannel:          channels.NewBaseChannel(name, msgBus, []string(cfg.AllowFrom)),
 		client:               NewClient(defaultClientTimeout),
-		creds:                creds,
 		ciStore:              ciStore,
 		cfg:                  cfg,
 		cursor:               newPollCursor(defaultCursorMaxEntries),
@@ -105,9 +112,10 @@ func New(name string, cfg config.ZaloOAConfig, creds *ChannelCreds,
 	}
 	c.tokens = &tokenSource{
 		client: c.client,
-		creds:  c.creds,
 		store:  c.ciStore,
 	}
+	c.tokens.creds.Store(creds)
+	c.reactionCtx, c.reactionCancel = context.WithCancel(context.Background())
 	return c, nil
 }
 
@@ -163,7 +171,7 @@ func (c *Channel) ResolvedWebhookSlug() string { return c.resolvedSlug }
 // a catch-up sweep; "polling" starts the listrecentchat poll loop.
 func (c *Channel) Start(_ context.Context) error {
 	c.SetRunning(true)
-	if c.creds.OAID == "" {
+	if c.creds().OAID == "" {
 		slog.Info("zalo_oa.started", "state", "unauthorized", "name", c.Name())
 		c.MarkDegraded("awaiting consent", "no oa_id yet — paste consent code to authorize",
 			channels.ChannelFailureKindAuth, true)
@@ -190,7 +198,7 @@ func (c *Channel) Start(_ context.Context) error {
 		// Background ctx so the loop survives the caller's ctx cancel; Stop()
 		// is the canonical exit signal. Each cycle uses its own per-tick ctx.
 		go c.runPollLoop(context.Background())
-		slog.Info("zalo_oa.started", "state", "connected", "oa_id", c.creds.OAID, "transport", "polling", "name", c.Name())
+		slog.Info("zalo_oa.started", "state", "connected", "oa_id", c.creds().OAID, "transport", "polling", "name", c.Name())
 		c.MarkHealthy("connected")
 	default:
 		c.MarkFailed("unknown transport",
@@ -209,13 +217,17 @@ func (c *Channel) Stop(_ context.Context) error {
 	if c.cfg.Transport == "webhook" && c.webhookRouter != nil {
 		c.webhookRouter.UnregisterInstance(c.instanceID)
 	}
-	// Cancel reaction debounce timers before WG.Wait so they don't leak.
+	// Cancel reaction debounce timers + any in-flight HTTP call before Wait.
 	c.reactions.Range(func(_, v any) bool {
 		if rc, ok := v.(*zaloReactionController); ok {
 			rc.Stop()
 		}
 		return true
 	})
+	if c.reactionCancel != nil {
+		c.reactionCancel()
+	}
+	c.reactionWG.Wait()
 	c.catchUpWG.Wait()
 	c.tickerWG.Wait()
 	c.pollWG.Wait()
@@ -249,7 +261,7 @@ func (c *Channel) Send(ctx context.Context, msg bus.OutboundMessage) error {
 	}
 	if len(msg.Media) > 1 {
 		slog.Info("zalo_oa.send.extra_media_skipped",
-			"oa_id", c.creds.OAID, "extra", len(msg.Media)-1)
+			"oa_id", c.creds().OAID, "extra", len(msg.Media)-1)
 	}
 
 	m := msg.Media[0]
@@ -283,7 +295,7 @@ func (c *Channel) Send(ctx context.Context, msg bus.OutboundMessage) error {
 			// Drop unsupported attachment, deliver trailing text + note.
 			// Avoids surfacing a hard error to the dispatcher.
 			slog.Warn("zalo_oa.send.unsupported_attachment_dropped",
-				"oa_id", c.creds.OAID, "mime", mt, "filename", filepath.Base(m.URL))
+				"oa_id", c.creds().OAID, "mime", mt, "filename", filepath.Base(m.URL))
 			fallback := mergeTrailingText(m.Caption, msg.Content)
 			heads := i18n.T(store.LocaleFromContext(ctx), i18n.MsgZaloOAUnsupportedAttachment,
 				filepath.Base(m.URL), mt)
@@ -310,7 +322,7 @@ func (c *Channel) Send(ctx context.Context, msg bus.OutboundMessage) error {
 	}
 	if _, terr := c.SendText(ctx, msg.ChatID, trailing, ""); terr != nil {
 		slog.Error("zalo_oa.send.text_after_attachment_failed",
-			"oa_id", c.creds.OAID, "user_id", msg.ChatID,
+			"oa_id", c.creds().OAID, "user_id", msg.ChatID,
 			"attachment_message_id", attachMID, "error", terr)
 		return fmt.Errorf("%w: %v", ErrPartialSend, terr)
 	}
@@ -434,7 +446,7 @@ func (c *Channel) markAuthFailedIfNeeded(err error) {
 // channels with zero RefreshTokenExpiresAt stay silent. Logs only on
 // transitions to avoid 30-minute log spam inside the warning window.
 func (c *Channel) evaluateReauthWarning() {
-	exp := c.creds.RefreshTokenExpiresAt
+	exp := c.creds().RefreshTokenExpiresAt
 	if exp.IsZero() {
 		return
 	}

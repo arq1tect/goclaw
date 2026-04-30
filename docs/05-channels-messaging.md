@@ -559,6 +559,12 @@ The WhatsApp channel connects directly to the WhatsApp network via the multi-dev
 
 ## 10. Zalo Bot + Zalo OA (two variants)
 
+> **Operator-facing setup guides live on the public docs site:**
+> - [Zalo OA setup (OAuth + webhook)](https://docs.goclaw.sh/channel-zalo-oa)
+> - [Zalo Bot setup (static token)](https://docs.goclaw.sh/channel-zalo-bot)
+>
+> This file documents the *channel-system architecture* — see those guides for end-to-end onboarding.
+
 Zalo ships two distinct channel types under the same "Official Account"
 umbrella. GoClaw exposes both; pick based on deployment scale and auth model.
 

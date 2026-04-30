@@ -626,3 +626,125 @@ func TestZaloAPIResponse_Roundtrip(t *testing.T) {
 		t.Error("OK field lost in round-trip")
 	}
 }
+
+func TestSendChatAction_PostsBodyWithParams(t *testing.T) {
+	var gotPath string
+	var gotBody map[string]any
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.Path
+		raw, _ := io.ReadAll(r.Body)
+		_ = json.Unmarshal(raw, &gotBody)
+		_, _ = w.Write([]byte(`{"ok":true,"result":{}}`))
+	}))
+	defer srv.Close()
+
+	ch := newTestChannel(t, srv.URL)
+	if err := ch.sendChatAction("chat-1", "typing"); err != nil {
+		t.Fatalf("sendChatAction: %v", err)
+	}
+	if gotPath != "/bott/sendChatAction" {
+		t.Errorf("path = %q, want /bott/sendChatAction", gotPath)
+	}
+	if gotBody["chat_id"] != "chat-1" {
+		t.Errorf("chat_id = %v, want chat-1", gotBody["chat_id"])
+	}
+	if gotBody["action"] != "typing" {
+		t.Errorf("action = %v, want typing", gotBody["action"])
+	}
+}
+
+func TestStartTyping_FiresAndStoresController(t *testing.T) {
+	var calls int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		atomic.AddInt32(&calls, 1)
+		_, _ = w.Write([]byte(`{"ok":true,"result":{}}`))
+	}))
+	defer srv.Close()
+
+	ch := newTestChannel(t, srv.URL)
+	ch.startTyping("chat-1")
+
+	// Allow the initial fire to land.
+	deadline := time.Now().Add(500 * time.Millisecond)
+	for time.Now().Before(deadline) && atomic.LoadInt32(&calls) == 0 {
+		time.Sleep(10 * time.Millisecond)
+	}
+	if got := atomic.LoadInt32(&calls); got < 1 {
+		t.Errorf("sendChatAction calls = %d, want ≥1", got)
+	}
+	if _, ok := ch.typingCtrls.Load("chat-1"); !ok {
+		t.Error("typingCtrls missing entry for chat-1")
+	}
+	_ = ch.Stop(context.Background())
+}
+
+func TestStartTyping_NoOpWhenNotRunning(t *testing.T) {
+	var calls int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		atomic.AddInt32(&calls, 1)
+		_, _ = w.Write([]byte(`{"ok":true,"result":{}}`))
+	}))
+	defer srv.Close()
+
+	swapAPIBase(t, srv.URL)
+	ch, err := New(config.ZaloConfig{Token: "t", DMPolicy: "open"}, bus.New(), nil)
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	ch.startTyping("chat-1")
+
+	time.Sleep(50 * time.Millisecond)
+	if got := atomic.LoadInt32(&calls); got != 0 {
+		t.Errorf("sendChatAction calls = %d, want 0 (channel not running)", got)
+	}
+	if _, ok := ch.typingCtrls.Load("chat-1"); ok {
+		t.Error("typingCtrls should be empty when channel not running")
+	}
+}
+
+func TestSend_StopsTypingController(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`{"ok":true,"result":{}}`))
+	}))
+	defer srv.Close()
+
+	ch := newTestChannel(t, srv.URL)
+	ch.startTyping("chat-1")
+	if _, ok := ch.typingCtrls.Load("chat-1"); !ok {
+		t.Fatal("precondition: typing controller not stored")
+	}
+
+	if err := ch.Send(context.Background(), bus.OutboundMessage{
+		ChatID:  "chat-1",
+		Content: "hi",
+	}); err != nil {
+		t.Fatalf("Send: %v", err)
+	}
+	if _, ok := ch.typingCtrls.Load("chat-1"); ok {
+		t.Error("typingCtrls entry should be cleared after Send")
+	}
+}
+
+func TestStop_DrainsTypingControllers(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`{"ok":true,"result":{}}`))
+	}))
+	defer srv.Close()
+
+	ch := newTestChannel(t, srv.URL)
+	ch.startTyping("chat-1")
+	ch.startTyping("chat-2")
+
+	if err := ch.Stop(context.Background()); err != nil {
+		t.Fatalf("Stop: %v", err)
+	}
+
+	count := 0
+	ch.typingCtrls.Range(func(_, _ any) bool {
+		count++
+		return true
+	})
+	if count != 0 {
+		t.Errorf("typingCtrls residual entries = %d, want 0", count)
+	}
+}

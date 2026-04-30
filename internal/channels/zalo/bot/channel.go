@@ -17,6 +17,7 @@ import (
 
 	"github.com/nextlevelbuilder/goclaw/internal/bus"
 	"github.com/nextlevelbuilder/goclaw/internal/channels"
+	"github.com/nextlevelbuilder/goclaw/internal/channels/typing"
 	"github.com/nextlevelbuilder/goclaw/internal/channels/zalo/common"
 	"github.com/nextlevelbuilder/goclaw/internal/config"
 	"github.com/nextlevelbuilder/goclaw/internal/store"
@@ -53,6 +54,8 @@ type Channel struct {
 	stopOnce sync.Once
 
 	legacyPhotoSentinelWarn sync.Once
+
+	typingCtrls sync.Map
 }
 
 func (c *Channel) SetInstanceID(id uuid.UUID) { c.instanceID = id }
@@ -154,7 +157,8 @@ func (c *Channel) Start(ctx context.Context) error {
 		c.resolvedSlug = slug
 
 		if c.inBootstrap() {
-			c.MarkDegraded(
+			c.MarkBootstrap(
+				channels.ChannelBootstrapAwaitingSecret,
 				"awaiting webhook secret",
 				"Bot Webhook Secret not yet set. Webhook acks Zalo's setWebhook verification ping (HTTP 200) but drops events. Paste the same secret you registered with setWebhook in Credentials → Webhook Secret to enable X-Bot-Api-Secret-Token verification.",
 				channels.ChannelFailureKindConfig,
@@ -192,6 +196,14 @@ func (c *Channel) Stop(_ context.Context) error {
 	}
 	c.stopOnce.Do(func() { close(c.stopCh) })
 	c.SetRunning(false)
+
+	c.typingCtrls.Range(func(key, val any) bool {
+		if ctrl, ok := val.(*typing.Controller); ok {
+			ctrl.Stop()
+		}
+		c.typingCtrls.Delete(key)
+		return true
+	})
 	return nil
 }
 
@@ -199,6 +211,10 @@ func (c *Channel) Stop(_ context.Context) error {
 func (c *Channel) Send(_ context.Context, msg bus.OutboundMessage) error {
 	if !c.IsRunning() {
 		return fmt.Errorf("zalo bot not running")
+	}
+
+	if ctrl, ok := c.typingCtrls.LoadAndDelete(msg.ChatID); ok {
+		ctrl.(*typing.Controller).Stop()
 	}
 
 	// Zalo Bot doesn't render markup.

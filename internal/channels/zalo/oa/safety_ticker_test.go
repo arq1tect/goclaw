@@ -182,7 +182,9 @@ func TestEvaluateReauthWarning_ClearsAfterReconsent(t *testing.T) {
 	}
 
 	// Operator re-consents — Phase 1 stamps a fresh expiry.
-	c.creds.RefreshTokenExpiresAt = time.Now().Add(60 * 24 * time.Hour)
+	snap := *c.creds()
+	snap.RefreshTokenExpiresAt = time.Now().Add(60 * 24 * time.Hour)
+	c.tokens.creds.Store(&snap)
 	c.evaluateReauthWarning()
 
 	if got := c.HealthSnapshot().State; got != channels.ChannelHealthStateHealthy {

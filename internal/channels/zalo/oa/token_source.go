@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log/slog"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/google/uuid"
@@ -20,25 +21,35 @@ const refreshMargin = 5 * time.Minute
 // callers. Shorter than the 15s defaultClientTimeout.
 const refreshHTTPTimeout = 12 * time.Second
 
-// tokenSource lazily refreshes the access token. ts.mu is the innermost
-// lock and is held across the HTTP refresh by design: Zalo refresh tokens
-// are single-use, so the in-critical-section roundtrip is the single-flight
-// guarantee. ctx cancellation unblocks a stuck refresh via the HTTP call.
+// tokenSource lazily refreshes the access token. ts.mu serializes refresh
+// (Zalo refresh tokens are single-use). Reads of creds go through the
+// atomic pointer; callers must treat the returned struct as read-only.
 type tokenSource struct {
 	client     *Client
-	creds      *ChannelCreds
+	creds      atomic.Pointer[ChannelCreds]
 	store      store.ChannelInstanceStore
 	instanceID uuid.UUID
 
-	mu sync.Mutex // guards creds.{Access,Refresh}Token + ExpiresAt + serializes refresh
+	mu sync.Mutex
+}
+
+// Snapshot returns a read-only pointer to the current creds.
+func (ts *tokenSource) Snapshot() *ChannelCreds {
+	if p := ts.creds.Load(); p != nil {
+		return p
+	}
+	return &ChannelCreds{}
 }
 
 // ForceRefresh marks the cached token stale so the next Access() refreshes.
 func (ts *tokenSource) ForceRefresh() {
 	ts.mu.Lock()
 	defer ts.mu.Unlock()
-	ts.creds.ExpiresAt = time.Time{}
-	ts.creds.AccessToken = ""
+	cur := ts.Snapshot()
+	next := *cur
+	next.ExpiresAt = time.Time{}
+	next.AccessToken = ""
+	ts.creds.Store(&next)
 }
 
 // Access returns a valid access token, refreshing if within refreshMargin.
@@ -46,14 +57,15 @@ func (ts *tokenSource) Access(ctx context.Context) (string, error) {
 	ts.mu.Lock()
 	defer ts.mu.Unlock()
 
-	if ts.creds.AccessToken != "" && time.Until(ts.creds.ExpiresAt) > refreshMargin {
-		return ts.creds.AccessToken, nil
+	cur := ts.Snapshot()
+	if cur.AccessToken != "" && time.Until(cur.ExpiresAt) > refreshMargin {
+		return cur.AccessToken, nil
 	}
 
 	if err := ts.doRefresh(ctx); err != nil {
 		return "", err
 	}
-	return ts.creds.AccessToken, nil
+	return ts.Snapshot().AccessToken, nil
 }
 
 // doRefresh performs the HTTP refresh + persistence. Holds ts.mu.
@@ -62,7 +74,8 @@ func (ts *tokenSource) Access(ctx context.Context) (string, error) {
 // but DB has stale tokens — next process restart will fail to invalid_grant
 // and surface re-auth, which is the safe failure mode.
 func (ts *tokenSource) doRefresh(ctx context.Context) error {
-	if ts.creds.RefreshToken == "" {
+	cur := ts.Snapshot()
+	if cur.RefreshToken == "" {
 		// Pre-authorization: distinct from a burned refresh token; do NOT
 		// escalate to Failed.
 		return ErrNotAuthorized
@@ -70,31 +83,31 @@ func (ts *tokenSource) doRefresh(ctx context.Context) error {
 
 	refreshCtx, cancel := context.WithTimeout(ctx, refreshHTTPTimeout)
 	defer cancel()
-	tok, rawErr := ts.client.RefreshToken(refreshCtx, ts.creds.AppID, ts.creds.SecretKey, ts.creds.RefreshToken)
+	tok, rawErr := ts.client.RefreshToken(refreshCtx, cur.AppID, cur.SecretKey, cur.RefreshToken)
 	if rawErr != nil {
 		err := classifyRefreshError(rawErr)
 		if errors.Is(err, ErrAuthExpired) {
-			slog.Warn("zalo_oa.reauth_required", "instance_id", ts.instanceID, "oa_id", ts.creds.OAID)
+			slog.Warn("zalo_oa.reauth_required", "instance_id", ts.instanceID, "oa_id", cur.OAID)
 			return err
 		}
-		slog.Warn("zalo_oa.refresh_failed", "instance_id", ts.instanceID, "oa_id", ts.creds.OAID, "error", err)
+		slog.Warn("zalo_oa.refresh_failed", "instance_id", ts.instanceID, "oa_id", cur.OAID, "error", err)
 		return err
 	}
 
-	snapshot := *ts.creds
+	snapshot := *cur
 	snapshot.WithTokens(tok)
 	if err := Persist(ctx, ts.store, ts.instanceID, &snapshot); err != nil {
-		slog.Error("zalo_oa.persist_failed", "instance_id", ts.instanceID, "oa_id", ts.creds.OAID, "error", err)
+		slog.Error("zalo_oa.persist_failed", "instance_id", ts.instanceID, "oa_id", cur.OAID, "error", err)
 		// Commit in memory: the new pair is the only valid one until restart.
-		*ts.creds = snapshot
+		ts.creds.Store(&snapshot)
 		return err
 	}
-	*ts.creds = snapshot
+	ts.creds.Store(&snapshot)
 	slog.Info("zalo_oa.token_refreshed",
 		"instance_id", ts.instanceID,
-		"oa_id", ts.creds.OAID,
-		"new_expires_at", ts.creds.ExpiresAt,
-		"refresh_expires_at", ts.creds.RefreshTokenExpiresAt,
+		"oa_id", snapshot.OAID,
+		"new_expires_at", snapshot.ExpiresAt,
+		"refresh_expires_at", snapshot.RefreshTokenExpiresAt,
 	)
 	return nil
 }

@@ -51,7 +51,7 @@ func (c *Channel) SendText(ctx context.Context, userID, text, quoteID string) (s
 			return lastMID, fmt.Errorf("zalo_oa.sendtext part %d/%d: %w", i+1, len(parts), err)
 		}
 		lastMID = mid
-		slog.Info("zalo_oa.sent", "type", "text", "message_id", mid, "oa_id", c.creds.OAID,
+		slog.Info("zalo_oa.sent", "type", "text", "message_id", mid, "oa_id", c.creds().OAID,
 			"part", i+1, "total_parts", len(parts), "quoted", q != "")
 	}
 	return lastMID, nil
@@ -68,7 +68,7 @@ func (c *Channel) postCSWithQuoteFallback(ctx context.Context, userID, text, quo
 	var apiErr *APIError
 	if errors.As(err, &apiErr) && Classify(apiErr.Code).Family == FamilyPayload {
 		slog.Warn("zalo_oa.send.quote_dropped_payload_error",
-			"oa_id", c.creds.OAID,
+			"oa_id", c.creds().OAID,
 			"user_id", userID,
 			"quote_message_id", quoteID,
 			"zalo_code", apiErr.Code,
@@ -91,7 +91,7 @@ func (c *Channel) SendImage(ctx context.Context, userID string, data []byte, mim
 	body := buildMediaAttachmentBody(userID, "image", tok)
 	mid, err := c.post(ctx, pathSendMessage, body)
 	if err == nil {
-		slog.Info("zalo_oa.sent", "type", "image", "message_id", mid, "oa_id", c.creds.OAID)
+		slog.Info("zalo_oa.sent", "type", "image", "message_id", mid, "oa_id", c.creds().OAID)
 	}
 	return mid, err
 }
@@ -108,7 +108,7 @@ func (c *Channel) SendGIF(ctx context.Context, userID string, data []byte) (stri
 	body := buildMediaAttachmentBody(userID, "gif", tok)
 	mid, err := c.post(ctx, pathSendMessage, body)
 	if err == nil {
-		slog.Info("zalo_oa.sent", "type", "gif", "message_id", mid, "oa_id", c.creds.OAID)
+		slog.Info("zalo_oa.sent", "type", "gif", "message_id", mid, "oa_id", c.creds().OAID)
 	}
 	return mid, err
 }
@@ -174,7 +174,7 @@ func (c *Channel) SendFile(ctx context.Context, userID string, data []byte, file
 	}
 	mid, err := c.post(ctx, pathSendMessage, buildFileAttachmentBody(userID, tok))
 	if err == nil {
-		slog.Info("zalo_oa.sent", "type", "file", "message_id", mid, "oa_id", c.creds.OAID)
+		slog.Info("zalo_oa.sent", "type", "file", "message_id", mid, "oa_id", c.creds().OAID)
 	}
 	return mid, err
 }

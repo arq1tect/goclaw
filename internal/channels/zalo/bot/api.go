@@ -120,3 +120,11 @@ func (c *Channel) sendPhoto(chatID, photoURL, caption string) error {
 	_, err := c.callAPI("sendPhoto", params)
 	return err
 }
+
+func (c *Channel) sendChatAction(chatID, action string) error {
+	_, err := c.callAPI("sendChatAction", map[string]any{
+		"chat_id": chatID,
+		"action":  action,
+	})
+	return err
+}

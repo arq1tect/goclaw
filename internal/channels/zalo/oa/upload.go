@@ -2,13 +2,14 @@ package oa
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"log/slog"
 	"path/filepath"
 	"strings"
 	"sync"
-	"time"
 )
 
 var legacyTokenWarnOnce sync.Once
@@ -69,8 +70,11 @@ func sanitizeFilename(raw string) string {
 	name := filepath.Base(strings.TrimSpace(raw))
 	switch name {
 	case "", ".", "..", string(filepath.Separator):
-		// UnixNano avoids same-second collisions in batched uploads.
-		return fmt.Sprintf("file-%d.bin", time.Now().UnixNano())
+		// crypto/rand suffix avoids collisions on coarse-clock platforms
+		// where UnixNano() can repeat across tight bursts.
+		var b [4]byte
+		_, _ = rand.Read(b[:])
+		return fmt.Sprintf("file-%s.bin", hex.EncodeToString(b[:]))
 	}
 	if len(name) > maxFilenameLen {
 		name = name[:maxFilenameLen]

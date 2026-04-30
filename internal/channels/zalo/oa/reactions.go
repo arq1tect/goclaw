@@ -83,15 +83,17 @@ func (rc *zaloReactionController) SetStatus(ctx context.Context, status string) 
 	}
 
 	rc.cancelDebounceLocked()
+	rc.ch.reactionWG.Add(1)
 	rc.debounceTimer = time.AfterFunc(reactionDebounceMs, func() {
+		defer rc.ch.reactionWG.Done()
 		rc.mu.Lock()
 		defer rc.mu.Unlock()
 		if rc.terminal {
 			return
 		}
 		if icon := resolveReactionEmoji(rc.lastStatus); icon != "" {
-			// Original ctx is gone by timer fire; mirror Telegram's pattern.
-			rc.applyReactionLocked(context.Background(), icon)
+			// Stop-aware ctx so Channel.Stop can drain in-flight HTTP calls.
+			rc.applyReactionLocked(rc.ch.reactionCtx, icon)
 		}
 	})
 }
@@ -104,7 +106,10 @@ func (rc *zaloReactionController) Stop() {
 
 func (rc *zaloReactionController) cancelDebounceLocked() {
 	if rc.debounceTimer != nil {
-		rc.debounceTimer.Stop()
+		// If Stop returns true the closure won't run; balance the Add.
+		if rc.debounceTimer.Stop() {
+			rc.ch.reactionWG.Done()
+		}
 		rc.debounceTimer = nil
 	}
 }

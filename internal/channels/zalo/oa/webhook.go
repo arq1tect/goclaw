@@ -42,7 +42,7 @@ func (e *oaInboundEvent) messageID() string {
 // Drops self-echoes (Sender.ID == OAID). In bootstrap mode drops every
 // event without decoding so Zalo's URL-save ping is acked but not
 // dispatched.
-func (c *Channel) HandleWebhookEvent(_ context.Context, raw json.RawMessage) error {
+func (c *Channel) HandleWebhookEvent(ctx context.Context, raw json.RawMessage) error {
 	if c.inBootstrap() {
 		n := c.bootstrapDroppedCount.Add(1)
 		// Cap warn-level at first hit so a guessed slug can't amplify logs.
@@ -61,9 +61,9 @@ func (c *Channel) HandleWebhookEvent(_ context.Context, raw json.RawMessage) err
 	if err := json.Unmarshal(raw, &e); err != nil {
 		return fmt.Errorf("zalo_oa.webhook: decode event: %w", err)
 	}
-	if e.Sender.ID != "" && e.Sender.ID == c.creds.OAID {
+	if e.Sender.ID != "" && e.Sender.ID == c.creds().OAID {
 		slog.Debug("zalo_oa.webhook.self_echo_filtered",
-			"oa_id", c.creds.OAID, "message_id", e.messageID())
+			"oa_id", c.creds().OAID, "message_id", e.messageID())
 		return nil
 	}
 
@@ -81,10 +81,10 @@ func (c *Channel) HandleWebhookEvent(_ context.Context, raw json.RawMessage) err
 		c.dispatchWebhookText(&e)
 		return nil
 	case "user_send_image", "user_send_gif", "user_send_sticker":
-		c.dispatchWebhookMedia(&e, true) // force image kind regardless of CDN MIME
+		c.dispatchWebhookMedia(ctx, &e, true) // force image kind regardless of CDN MIME
 		return nil
 	case "user_send_file":
-		c.dispatchWebhookMedia(&e, false)
+		c.dispatchWebhookMedia(ctx, &e, false)
 		return nil
 	case "user_send_link":
 		c.dispatchWebhookLink(&e)
@@ -115,11 +115,11 @@ func (c *Channel) dispatchWebhookText(e *oaInboundEvent) {
 // URL-save ping returns 200; events are dropped in HandleWebhookEvent.
 func (c *Channel) SignatureVerifier() common.SignatureVerifier {
 	if c.inBootstrap() {
-		return newOASignatureVerifier(c.creds.AppID, "", SignatureModeDisabled, 0)
+		return newOASignatureVerifier(c.creds().AppID, "", SignatureModeDisabled, 0)
 	}
 	return newOASignatureVerifier(
-		c.creds.AppID,
-		c.creds.WebhookSecretKey,
+		c.creds().AppID,
+		c.creds().WebhookSecretKey,
 		c.cfg.WebhookSignatureMode,
 		clampReplayWindowSeconds(c.cfg.WebhookReplayWindowSeconds),
 	)

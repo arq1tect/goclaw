@@ -59,7 +59,7 @@ func (c *Channel) SendReaction(ctx context.Context, userID, sourceMessageID, rea
 		var apiErr *APIError
 		if errors.As(err, &apiErr) && apiErr.Info().Family == FamilyPayload {
 			slog.Warn("zalo_oa.reaction.dropped_payload_error",
-				"oa_id", c.creds.OAID,
+				"oa_id", c.creds().OAID,
 				"user_id", userID,
 				"source_message_id", sourceMessageID,
 				"icon", reactIcon,
@@ -68,7 +68,7 @@ func (c *Channel) SendReaction(ctx context.Context, userID, sourceMessageID, rea
 				"hint", "source message_id likely expired/deleted/over-50-cap")
 		} else {
 			slog.Debug("zalo_oa.reaction.send_failed",
-				"oa_id", c.creds.OAID,
+				"oa_id", c.creds().OAID,
 				"user_id", userID,
 				"source_message_id", sourceMessageID,
 				"icon", reactIcon,
@@ -78,7 +78,7 @@ func (c *Channel) SendReaction(ctx context.Context, userID, sourceMessageID, rea
 	}
 	mid, _ := parseMessageResponse(raw)
 	slog.Debug("zalo_oa.reaction.sent",
-		"oa_id", c.creds.OAID,
+		"oa_id", c.creds().OAID,
 		"user_id", userID,
 		"source_message_id", sourceMessageID,
 		"icon", reactIcon,

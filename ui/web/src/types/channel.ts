@@ -43,6 +43,9 @@ export interface ChannelRuntimeStatus {
     hint?: string;
     target?: "credentials" | "advanced" | "reauth" | "details";
   };
+  /** Locale-independent flag for degraded states that are part of normal
+   *  setup (not faults). UIs gate setup banners on this. */
+  bootstrap_state?: "awaiting_secret";
 }
 
 export interface ChannelInstanceInput {
