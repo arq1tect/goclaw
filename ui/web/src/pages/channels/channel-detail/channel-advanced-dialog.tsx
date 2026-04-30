@@ -42,10 +42,15 @@ function getAdvancedFields(channelType: string) {
 
 function deriveInitialValues(instance: ChannelInstanceData): Record<string, unknown> {
   const config = (instance.config ?? {}) as Record<string, unknown>;
-  // Only keep advanced keys (exclude essential + groups)
   return Object.fromEntries(
     Object.entries(config).filter(([k]) => !ESSENTIAL_CONFIG_KEYS.has(k) && k !== "groups"),
   );
+}
+
+// Drop keys not present in the current schema (e.g. fields removed in a
+// recent release). Without this, MergeConfig keeps re-posting the orphan.
+function knownKeys(channelType: string): Set<string> {
+  return new Set((configSchema[channelType] ?? []).map((f) => f.key));
 }
 
 export function ChannelAdvancedDialog({
@@ -75,11 +80,15 @@ export function ChannelAdvancedDialog({
     setSaving(true);
     try {
       const existingConfig = (instance.config ?? {}) as Record<string, unknown>;
+      const valid = knownKeys(instance.channel_type);
+      // Preserve essential keys + groups; drop unknown (legacy) keys.
+      const preserved = Object.fromEntries(
+        Object.entries(existingConfig).filter(([k]) => valid.has(k) || ESSENTIAL_CONFIG_KEYS.has(k) || k === "groups"),
+      );
       const cleanAdvanced = Object.fromEntries(
         Object.entries(values).filter(([, v]) => v !== undefined && v !== "" && v !== null),
       );
-      // Merge: preserve essential keys and groups from existing, overwrite advanced keys
-      const merged = { ...existingConfig, ...cleanAdvanced };
+      const merged = { ...preserved, ...cleanAdvanced };
       await onUpdate({ config: merged });
       onOpenChange(false);
     } catch { // toast shown by hook

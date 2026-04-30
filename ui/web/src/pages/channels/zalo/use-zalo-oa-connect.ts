@@ -105,16 +105,20 @@ export function useZaloOAConnect(
   // Fetch consent URL once the flow becomes active.
   useEffect(() => {
     if (!active || !instanceId) return;
+    let cancelled = false;
     consent
       .call({ instance_id: instanceId })
       .then((resp) => {
-        if (!aliveRef.current) return;
+        if (cancelled || !aliveRef.current) return;
         setUrl(resp.url);
         setState(resp.state);
       })
       .catch(() => {
         // error captured on consent.error
       });
+    return () => {
+      cancelled = true;
+    };
     // consent.call identity churns per render; the instanceId+active trigger is intentional
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active, instanceId]);
