@@ -625,13 +625,13 @@ knobs to reduce silent message loss on bursty OAs:
 
 | Setting | Default | Range | Notes |
 |---|---|---|---|
-| `poll_count` | 50 | [10, 200] | Page size per `listrecentchat` call |
-| `poll_burndown_max_pages` | 5 | [1, 20] | Max consecutive pages per cycle; set to 1 to disable burn-down |
+| `poll_count` | 10 | [1, 10] | Page size per `listrecentchat` call (Zalo hard-caps at 10; values above return error -210, so anything bigger is silently clamped) |
+| `poll_burndown_max_pages` | 10 | [1, 20] | Max consecutive pages per cycle; set to 1 to disable burn-down |
 | `poll_interval_seconds` | 15 | [5, 120] | Cycle interval |
 
-At default settings the per-cycle ceiling is 50 × 5 = 250 messages —
-~25× the prior hardcoded 10. Burn-down stops on the first partial page or
-when `poll_burndown_max_pages` is reached (the cap emits
+At default settings the per-cycle ceiling is 10 × 10 = 100 messages.
+Burn-down stops on the first partial page or when
+`poll_burndown_max_pages` is reached (the cap emits
 `zalo_oa.poll.burndown_capped`). These fields are ignored when
 `transport: "webhook"`.
 
