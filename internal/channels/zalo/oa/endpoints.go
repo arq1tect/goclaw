@@ -9,6 +9,10 @@ const (
 	pathSendMessage    = "/v3.0/oa/message/cs"
 	pathListRecentChat = "/v2.0/oa/listrecentchat"
 
+	// Reactions ride the v2.0 message endpoint with a sender_action body —
+	// distinct from pathSendMessage (v3.0/cs) by both version and shape.
+	pathSendReaction = "/v2.0/oa/message"
+
 	// Upload caps enforced by Zalo: image 1MB, file 5MB, gif 5MB.
 	pathUploadImage = "/v2.0/oa/upload/image"
 	pathUploadFile  = "/v2.0/oa/upload/file"

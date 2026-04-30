@@ -171,6 +171,7 @@ type ZaloOAConfig struct {
 	AllowFrom            FlexibleStringSlice `json:"allow_from,omitempty"`
 	DMPolicy             string              `json:"dm_policy,omitempty"`
 	BlockReply           *bool               `json:"block_reply,omitempty"`
+	ReactionLevel        string              `json:"reaction_level,omitempty"` // "off" (default), "minimal", "full" — status emoji reactions
 
 	// Webhook transport (phase 05). Polling is the default.
 	Transport                  string `json:"transport,omitempty"`                     // "polling" (default) | "webhook"

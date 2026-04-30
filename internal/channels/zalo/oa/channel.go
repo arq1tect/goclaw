@@ -32,9 +32,6 @@ var ErrPartialSend = errors.New("zalo_oa: attachment delivered but trailing text
 const (
 	defaultClientTimeout        = 15 * time.Second
 	defaultSafetyTickerInterval = 30 * time.Minute
-	// reauthWarningWindow: surface "re-consent due soon" once the refresh
-	// token's remaining lifetime drops to or below this window.
-	reauthWarningWindow = 14 * 24 * time.Hour
 )
 
 // Channel is the Zalo OA channel. Upload caps enforced by Zalo (error -210):
@@ -368,8 +365,6 @@ func (c *Channel) runSafetyTicker() {
 			if _, err := c.tokens.Access(ctx); err != nil && !errors.Is(err, ErrNotAuthorized) {
 				c.markAuthFailedIfNeeded(err)
 				slog.Warn("zalo_oa.safety_tick_refresh_failed", "instance_id", c.instanceID, "error", err)
-			} else {
-				c.evaluateReauthWarning()
 			}
 			cancel()
 		}
@@ -411,53 +406,6 @@ func (c *Channel) markAuthFailedIfNeeded(err error) {
 			i18n.T(i18n.DefaultLocale, i18n.MsgZaloOAErrAuth, apiErr.Code, apiErr.Message),
 			channels.ChannelFailureKindAuth,
 			false,
-		)
-	}
-}
-
-// evaluateReauthWarning transitions Healthy <-> Degraded(warn) based on how
-// close RefreshTokenExpiresAt is. Called after each successful safety-tick
-// refresh. Failed states are left alone (Failed wins over warning); legacy
-// channels with zero RefreshTokenExpiresAt stay silent. Logs only on
-// transitions to avoid 30-minute log spam inside the warning window.
-func (c *Channel) evaluateReauthWarning() {
-	exp := c.creds.RefreshTokenExpiresAt
-	if exp.IsZero() {
-		return
-	}
-	remaining := time.Until(exp)
-	if remaining <= 0 {
-		return // imminent failure — let the Auth path surface it
-	}
-	snap := c.HealthSnapshot()
-	if snap.State == channels.ChannelHealthStateFailed {
-		return
-	}
-
-	inWindow := remaining <= reauthWarningWindow
-	isWarning := snap.State == channels.ChannelHealthStateDegraded &&
-		snap.FailureKind == channels.ChannelFailureKindAuth &&
-		snap.Retryable
-
-	switch {
-	case inWindow && snap.State == channels.ChannelHealthStateHealthy:
-		days := int(remaining.Hours()/24) + 1 // round up; 0.5d → "1 day"
-		c.MarkDegraded(
-			"Re-consent due soon",
-			i18n.T(i18n.DefaultLocale, i18n.MsgZaloOAReauthDueSoon, days),
-			channels.ChannelFailureKindAuth,
-			true,
-		)
-		slog.Info("zalo_oa.reauth_warning",
-			"instance_id", c.instanceID,
-			"days_remaining", days,
-			"expires_at", exp,
-		)
-	case !inWindow && isWarning:
-		c.MarkHealthy("connected")
-		slog.Info("zalo_oa.reauth_warning_cleared",
-			"instance_id", c.instanceID,
-			"expires_at", exp,
 		)
 	}
 }

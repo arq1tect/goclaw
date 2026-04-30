@@ -192,6 +192,7 @@ export const configSchema: Record<string, FieldDef[]> = {
     { key: "poll_burndown_max_pages", label: "Burn-down Max Pages", type: "number", defaultValue: 10, showWhen: { key: "transport", value: "polling" }, help: "Max consecutive listrecentchat pages per cycle (page size × max pages = messages drained). Default 10, max 20. Set to 1 to disable burn-down." },
     { key: "allow_from", label: "Allowed Users", type: "tags", help: "Zalo user IDs (empty = allow all)" },
     { key: "dm_policy", label: "DM Policy", type: "select", options: dmPolicyOptions, defaultValue: "pairing" },
+    { key: "reaction_level", label: "Reaction Level", type: "select", options: [{ value: "off", label: "Off" }, { value: "minimal", label: "Minimal (terminal only)" }, { value: "full", label: "Full (+ thinking ack)" }], defaultValue: "off", help: "Drop a Zalo emoji on the user's message to signal agent run state. OA caps reactions at 50 per message_id — pick Minimal for production B2C agents." },
     { key: "block_reply", label: "Block Reply", type: "select", options: blockReplyOptions, defaultValue: "inherit", help: "Deliver intermediate text during tool iterations" },
   ],
   zalo_personal: [

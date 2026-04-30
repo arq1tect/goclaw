@@ -104,7 +104,17 @@ Outbound CS replies automatically quote the user's last inbound message via Zalo
 - Image / file / GIF sends do not quote (Zalo API doesn't support quoted attachments).
 - If the source message is older than Zalo's 48h interaction window or has been deleted, the gateway transparently retries without the quote field — the reply is still delivered, with a `zalo_oa.send.quote_dropped_payload_error` warning logged for diagnostics.
 
-## 6. Reference
+## 6. Reactions (status emoji on user messages)
+
+Set `reaction_level` in the channel config to surface agent run progress as a Zalo reaction on the user's inbound message. The defaults are tuned for the B2C / customer-service surface that real OAs run — quiet by default, conservative when on:
+
+- `off` (**default**) — no reactions sent. Existing tenants stay silent on upgrade.
+- `minimal` (**recommended for production**) — terminal-only: `/-heart` on success, `:-((` on failure. Exactly 0–2 reactions per agent run; doesn't pollute the customer's chat with mid-flight noise.
+- `full` — adds a single "received, working on it" `--b` (thumbs-up) on the first intermediate event, debounced to ≤1 call per 700 ms. Mid-run tool/coding/web statuses are intentionally NOT mapped on Zalo OA — chatty intermediate reactions on a customer support conversation feel unprofessional and eat into the 50-reaction-per-`message_id` cap. If you need the full Telegram-style transition set, extend `statusReactionVariants` in `internal/channels/zalo/oa/reactions.go`.
+
+Zalo OA caps reactions at 50 per source `message_id`. The endpoint (`POST /v2.0/oa/message`) does NOT count against the OA monthly active-message quota. Reactions are best-effort: failures are logged at Debug and never flip channel health. `ClearReaction` sends the `/-remove` sentinel to retract a previously dropped reaction (Zalo has no separate clear endpoint).
+
+## 7. Reference
 
 - Backend webhook router: `internal/channels/zalo/common/webhook_router.go`
 - Slug helpers: `internal/channels/zalo/common/slug.go`
