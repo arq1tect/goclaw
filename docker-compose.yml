@@ -49,6 +49,7 @@ services:
       - GOCLAW_SKILLS_DIR=/app/data/skills
       # Debug
       - GOCLAW_TRACE_VERBOSE=${GOCLAW_TRACE_VERBOSE:-0}
+      - GOCLAW_LOG_LEVEL=${GOCLAW_LOG_LEVEL:-info}
     volumes:
       - goclaw-data:/app/data
       - goclaw-workspace:/app/workspace
