@@ -83,6 +83,10 @@ func (v *oaSignatureVerifier) Verify(headers http.Header, body []byte) error {
 
 	tsInt, err := extractTimestamp(body)
 	if err != nil {
+		if v.mode == SignatureModeLogOnly {
+			slog.Warn("security.zalo_oa_webhook_bad_timestamp_log_only", "err", err)
+			return nil
+		}
 		return err
 	}
 	tsStr := strconv.FormatInt(tsInt, 10) // canonical decimal
