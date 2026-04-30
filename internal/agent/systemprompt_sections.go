@@ -445,10 +445,8 @@ func buildRuntimeSection(cfg SystemPromptConfig) []string {
 	return lines
 }
 
-// buildChannelFormattingHint returns platform-specific formatting guidance:
-// markdown rendering, per-message length caps, and outbound attachment
-// constraints. The runtime will still auto-chunk and reject unsupported
-// MIMEs at the channel layer, but a heads-up here saves a round-trip.
+// buildChannelFormattingHint returns platform-specific guidance: markdown
+// rendering, per-message length caps, and outbound attachment limits.
 func buildChannelFormattingHint(channelType string) []string {
 	switch channelType {
 	case "zalo_personal":
@@ -461,9 +459,6 @@ func buildChannelFormattingHint(channelType string) []string {
 			"",
 		}
 	case "zalo_oa", "zalo_bot":
-		// OA and Bot share identical Zalo API constraints (PDF/DOC/DOCX
-		// upload allowlist, 1 MB image cap, 5 MB GIF/file cap, 2000-char
-		// text cap, no markdown rendering).
 		return []string{
 			"## Output Formatting (Zalo Official Account / Bot)",
 			"",

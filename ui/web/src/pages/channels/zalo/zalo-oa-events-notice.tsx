@@ -6,10 +6,7 @@ interface ZaloOAEventsNoticeProps {
   channelType: string;
 }
 
-// Event toggles a Zalo OA app must enable on developers.zalo.me Webhook tab.
-// Goclaw forwards each of these to the agent; if a toggle is OFF on Zalo's
-// side, that event simply never reaches us. Keep this list in sync with
-// the switch in internal/channels/zalo/oa/webhook.go HandleWebhookEvent.
+// Keep in sync with the event switch in internal/channels/zalo/oa/webhook.go.
 const SUPPORTED_EVENTS = [
   "user_send_text",
   "user_send_image",
@@ -19,8 +16,6 @@ const SUPPORTED_EVENTS = [
   "user_send_file",
 ];
 
-// Visible only for zalo_oa. Borrows the collapsible amber-card pattern from
-// ChannelScopesInfo so wizard chrome stays consistent.
 export function ZaloOAEventsNotice({ channelType }: ZaloOAEventsNoticeProps) {
   const { t } = useTranslation("channels");
   const [expanded, setExpanded] = useState(false);

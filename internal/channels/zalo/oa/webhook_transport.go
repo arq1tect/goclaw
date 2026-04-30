@@ -19,11 +19,9 @@ func resolveSlug(cfgPath, name string) string {
 }
 
 // startWebhookTransport registers with the shared router and optionally
-// fires the catch-up sweep. Returns nil on misconfig (channel is marked
-// Failed) so instance_loader doesn't crash. When the channel is webhook
-// + signature-enforcing but has no secret yet, registers the slug and
-// enters bootstrap mode (Degraded health, acks ping, drops events) so
-// the operator can finish the Zalo console flow.
+// fires the catch-up sweep. Returns nil on misconfig so instance_loader
+// doesn't crash. Channels with no webhook secret yet enter bootstrap
+// mode (Degraded, acks ping, drops events).
 func (c *Channel) startWebhookTransport() error {
 	slug := resolveSlug(c.cfg.WebhookPath, c.Name())
 	if err := c.webhookRouter.RegisterInstance(c.instanceID, c, c.TenantID(), slug); err != nil {

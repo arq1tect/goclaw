@@ -62,9 +62,7 @@ export function ChannelCredentialsTab({ instance, status, onUpdate }: ChannelCre
     setValues(initialCredsValues(fields, instance.credentials));
   }, [fields, instance.credentials]);
 
-  // Backend Phase 01 sets summary "awaiting webhook secret" on Degraded
-  // when zalo_oa is in webhook bootstrap mode. Match on summary substring
-  // to keep the flag KISS — no new health field on the wire.
+  // Substring-match the backend's degraded summary; avoids a dedicated wire field.
   const isZaloOABootstrap =
     instance.channel_type === "zalo_oa" &&
     status?.state === "degraded" &&

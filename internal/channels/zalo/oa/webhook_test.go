@@ -269,8 +269,7 @@ func TestHandleWebhookEvent_FiltersSelfEcho(t *testing.T) {
 	}
 }
 
-// stubDownloader swaps downloadOAMediaFn to write a fixture file and
-// return its path, bypassing SSRF + network so tests can run hermetically.
+// stubDownloader writes a fixture file and bypasses SSRF for hermetic tests.
 func stubDownloader(t *testing.T, ext string, body []byte) {
 	t.Helper()
 	prev := downloadOAMediaFn
@@ -288,8 +287,6 @@ func stubDownloader(t *testing.T, ext string, body []byte) {
 	t.Cleanup(func() { downloadOAMediaFn = prev })
 }
 
-// Image / gif / sticker / file events now download the attachment URL and
-// dispatch it as media (replaces the old log-and-skip behavior).
 func TestHandleWebhookEvent_DispatchesImage(t *testing.T) {
 	stubDownloader(t, ".jpg", []byte("\xff\xd8\xff\xe0fake-jpeg"))
 	ch, mb := newWebhookChannel(t, "secret", "strict", 0)
@@ -311,7 +308,6 @@ func TestHandleWebhookEvent_DispatchesImage(t *testing.T) {
 	}
 }
 
-// File event: dispatches with detected MIME, NOT forced to image.
 func TestHandleWebhookEvent_DispatchesFile(t *testing.T) {
 	stubDownloader(t, ".xlsx", []byte("PK\x03\x04xlsx-bytes"))
 	ch, mb := newWebhookChannel(t, "secret", "strict", 0)
@@ -333,7 +329,6 @@ func TestHandleWebhookEvent_DispatchesFile(t *testing.T) {
 	}
 }
 
-// Link event: no download, dispatched as text-only with title + URL.
 func TestHandleWebhookEvent_DispatchesLink(t *testing.T) {
 	t.Parallel()
 	ch, mb := newWebhookChannel(t, "secret", "strict", 0)
@@ -357,7 +352,6 @@ func TestHandleWebhookEvent_DispatchesLink(t *testing.T) {
 	}
 }
 
-// Attachment event with empty URL: dropped, no panic, no dispatch.
 func TestHandleWebhookEvent_AttachmentMissingURL(t *testing.T) {
 	t.Parallel()
 	ch, mb := newWebhookChannel(t, "secret", "strict", 0)
@@ -381,9 +375,7 @@ func TestHandleWebhookEvent_UnknownEventNoError(t *testing.T) {
 	}
 }
 
-// Real Zalo webhook sends `timestamp` as a STRING ("1714476720000"), not
-// a number. Decode must accept both shapes — int64 typing on the struct
-// breaks production traffic with "cannot unmarshal string into ... int64".
+// Zalo sends `timestamp` as a string in real traffic; decode must not break.
 func TestHandleWebhookEvent_AcceptsStringTimestamp(t *testing.T) {
 	t.Parallel()
 	ch, mb := newWebhookChannel(t, "secret", "strict", 0)
@@ -423,9 +415,6 @@ func TestMessageIDExtractor(t *testing.T) {
 	}
 }
 
-// transport=webhook + signature_mode=strict + no secret → MarkDegraded
-// (bootstrap), slug routed, drop counter starts at 0. Replaces the old
-// MarksFailed test — backend behavior change is intentional.
 func TestStart_WebhookMissingSecretEntersBootstrap(t *testing.T) {
 	t.Parallel()
 	creds := &ChannelCreds{AppID: "app-1", SecretKey: "k", OAID: "oa-1"}

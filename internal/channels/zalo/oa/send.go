@@ -23,16 +23,13 @@ func isZaloSupportedFileMIME(mime string) bool {
 	return false
 }
 
-// maxTextLength is Zalo OA's per-message text cap (error -210 above this).
-// Matches the same constant in zalo_bot / zalo_personal — all three Zalo
-// flavors share the 2000-char ceiling and the channels.ChunkMarkdown
-// fence-aware splitter.
+// maxTextLength is Zalo's per-message cap; longer payloads error -210.
+// Same value across zalo_bot / zalo_personal / zalo_oa.
 const maxTextLength = 2000
 
-// SendText delivers plain text. Splits replies longer than the Zalo cap
-// into multiple sequential sends via the shared markdown-aware chunker,
-// so the LLM's full answer reaches the user without breaking code fences.
-// Returns the final upstream message_id (or first error encountered).
+// SendText splits replies via channels.ChunkMarkdown so >2000-char
+// messages reach the user as multiple ordered sends. Returns the final
+// upstream message_id.
 func (c *Channel) SendText(ctx context.Context, userID, text string) (string, error) {
 	if strings.TrimSpace(text) == "" {
 		return "", nil

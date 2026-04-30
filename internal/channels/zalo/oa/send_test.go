@@ -176,8 +176,6 @@ func TestSendText_HappyPath(t *testing.T) {
 	}
 }
 
-// Long messages must split into ≤2000-rune chunks (Zalo error -210 cap).
-// Verifies count, ordering, and that each chunk fits.
 func TestSendText_ChunksLongMessages(t *testing.T) {
 	t.Parallel()
 	api, captured, _ := newAPIServer(t, apiServerOpts{
@@ -527,9 +525,6 @@ func TestChannelSend_MediaTooLarge(t *testing.T) {
 	}
 }
 
-// Outbound markdown must be stripped before reaching Zalo — same safety
-// net as zalo_bot and zalo_personal. Users would otherwise see literal
-// **, __, ---, etc. since Zalo OA renders no markup.
 func TestChannelSend_StripsMarkdown(t *testing.T) {
 	t.Parallel()
 	api, captured, _ := newAPIServer(t, apiServerOpts{
@@ -564,9 +559,6 @@ func TestChannelSend_StripsMarkdown(t *testing.T) {
 	}
 }
 
-// Unsupported MIME (e.g. xlsx) on outbound: drop attachment, send the
-// trailing text + fallback note. No error to the dispatcher → no
-// "Failed to deliver" banner shown to the user.
 func TestChannelSend_UnsupportedMIMEFallsBackToText(t *testing.T) {
 	t.Parallel()
 	api, captured, _ := newAPIServer(t, apiServerOpts{

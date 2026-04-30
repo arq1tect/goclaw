@@ -9,11 +9,9 @@ import (
 	"github.com/nextlevelbuilder/goclaw/internal/channels/zalo/common"
 )
 
-// oaInboundEvent maps a Zalo OA webhook event. Image/file/sticker
-// variants are accepted but ignored (text-only). Top-level "timestamp"
-// is intentionally omitted — Zalo sends it as a string in real traffic
-// (json.Number is fine, but we don't use it here; signature verifier
-// reads it independently via extractTimestamp).
+// oaInboundEvent maps a Zalo OA webhook event. Top-level "timestamp" is
+// intentionally omitted — Zalo sends it as a string in real traffic;
+// the signature verifier reads it independently via extractTimestamp.
 type oaInboundEvent struct {
 	EventName string `json:"event_name"`
 	AppID     string `json:"app_id"`
@@ -41,10 +39,9 @@ func (e *oaInboundEvent) messageID() string {
 }
 
 // HandleWebhookEvent routes a verified+deduped event onto the message bus.
-// Drops self-echoes (Sender.ID == OAID) so we don't reply to our own sends.
-// In bootstrap mode (no webhook secret yet) drops every event without
-// decoding so Zalo's URL-verification ping and any pre-secret traffic are
-// acked but not dispatched.
+// Drops self-echoes (Sender.ID == OAID). In bootstrap mode drops every
+// event without decoding so Zalo's URL-save ping is acked but not
+// dispatched.
 func (c *Channel) HandleWebhookEvent(_ context.Context, raw json.RawMessage) error {
 	if c.inBootstrap() {
 		n := c.bootstrapDroppedCount.Add(1)
@@ -69,12 +66,9 @@ func (c *Channel) HandleWebhookEvent(_ context.Context, raw json.RawMessage) err
 		c.dispatchWebhookText(&e)
 		return nil
 	case "user_send_image", "user_send_gif", "user_send_sticker":
-		// Image / gif / sticker → always classify as image so the agent
-		// treats them visually, regardless of CDN MIME quirks.
-		c.dispatchWebhookMedia(&e, true)
+		c.dispatchWebhookMedia(&e, true) // force image kind regardless of CDN MIME
 		return nil
 	case "user_send_file":
-		// File: classify by detected MIME (xlsx → document, mp4 → video, …).
 		c.dispatchWebhookMedia(&e, false)
 		return nil
 	case "user_send_link":
@@ -89,8 +83,6 @@ func (c *Channel) HandleWebhookEvent(_ context.Context, raw json.RawMessage) err
 	}
 }
 
-// dispatchWebhookText forwards a text event via BaseChannel.HandleMessage
-// (same downstream path as polling).
 func (c *Channel) dispatchWebhookText(e *oaInboundEvent) {
 	if e.Message.Text == "" || e.Sender.ID == "" {
 		return
@@ -104,9 +96,8 @@ func (c *Channel) dispatchWebhookText(e *oaInboundEvent) {
 }
 
 // SignatureVerifier returns a verifier bound to this channel's webhook
-// secret + signature mode. In bootstrap mode the verifier accepts any
-// payload so Zalo's URL-save verification ping returns 200 — events are
-// dropped downstream by HandleWebhookEvent.
+// secret + signature mode. Bootstrap mode accepts any payload so Zalo's
+// URL-save ping returns 200; events are dropped in HandleWebhookEvent.
 func (c *Channel) SignatureVerifier() common.SignatureVerifier {
 	if c.inBootstrap() {
 		return newOASignatureVerifier(c.creds.AppID, "", SignatureModeDisabled, 0)

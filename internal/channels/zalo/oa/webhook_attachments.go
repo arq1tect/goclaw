@@ -16,16 +16,11 @@ import (
 	"github.com/nextlevelbuilder/goclaw/internal/tools"
 )
 
-// oaAttachment is a single attachment item inside the Zalo OA event payload.
-// Image / file / sticker / gif / link events all share this shape; the
-// per-type fields below are populated selectively by Zalo.
 type oaAttachment struct {
-	Type    string             `json:"type"`
+	Type    string              `json:"type"`
 	Payload oaAttachmentPayload `json:"payload"`
 }
 
-// oaAttachmentPayload covers fields seen across image / file / sticker /
-// gif / link events. URL is universal; the rest are best-effort.
 type oaAttachmentPayload struct {
 	URL         string `json:"url,omitempty"`
 	Thumbnail   string `json:"thumbnail,omitempty"`
@@ -34,8 +29,6 @@ type oaAttachmentPayload struct {
 	Description string `json:"description,omitempty"`
 }
 
-// firstAttachmentURL returns the URL of the first attachment with a
-// non-empty Payload.URL. Empty when the event has no attachments.
 func firstAttachmentURL(atts []oaAttachment) string {
 	for _, a := range atts {
 		if a.Payload.URL != "" {
@@ -45,8 +38,6 @@ func firstAttachmentURL(atts []oaAttachment) string {
 	return ""
 }
 
-// firstAttachment returns a pointer to the first attachment (or nil).
-// Useful for link events where we need the title/description, not just URL.
 func firstAttachment(atts []oaAttachment) *oaAttachment {
 	if len(atts) == 0 {
 		return nil
@@ -54,10 +45,9 @@ func firstAttachment(atts []oaAttachment) *oaAttachment {
 	return &atts[0]
 }
 
-// dispatchWebhookMedia downloads the first attachment URL and forwards it
-// as a MediaInfo-tagged inbound. Used for user_send_image, user_send_gif,
-// user_send_sticker, user_send_file. Sticker / gif are classified as image
-// regardless of MIME so the agent treats them visually.
+// dispatchWebhookMedia downloads the attachment URL and forwards it as a
+// MediaInfo-tagged inbound. forceImageKind classifies stickers/gifs as
+// image regardless of detected MIME so the agent treats them visually.
 func (c *Channel) dispatchWebhookMedia(e *oaInboundEvent, forceImageKind bool) {
 	if e.Sender.ID == "" {
 		return
@@ -101,8 +91,6 @@ func (c *Channel) dispatchWebhookMedia(e *oaInboundEvent, forceImageKind bool) {
 		SourceURL:   url,
 	}})
 
-	// Combine the user's caption (Message.Text) with the media tag so the
-	// agent sees both. Zalo file/image events often carry an empty Text.
 	content := strings.TrimSpace(e.Message.Text)
 	if content == "" {
 		content = tag
@@ -118,17 +106,14 @@ func (c *Channel) dispatchWebhookMedia(e *oaInboundEvent, forceImageKind bool) {
 	c.BaseChannel.HandleMessage(e.Sender.ID, e.Sender.ID, content, []string{path}, metadata, "direct")
 }
 
-// dispatchWebhookLink forwards a shared-link event as plain text so the
-// agent can decide whether to follow up. We don't fetch the URL — link
-// previews are out of scope for this layer (and would risk SSRF on
-// arbitrary user-shared URLs).
+// dispatchWebhookLink forwards a shared link as plain text. We don't fetch
+// the URL — arbitrary user-shared links would risk SSRF.
 func (c *Channel) dispatchWebhookLink(e *oaInboundEvent) {
 	if e.Sender.ID == "" {
 		return
 	}
 	att := firstAttachment(e.Message.Attachments)
 	if att == nil || att.Payload.URL == "" {
-		// No structured link — fall back to whatever Text Zalo provided.
 		if strings.TrimSpace(e.Message.Text) != "" {
 			c.dispatchWebhookText(e)
 		}
@@ -159,16 +144,12 @@ func (c *Channel) dispatchWebhookLink(e *oaInboundEvent) {
 	c.BaseChannel.HandleMessage(e.Sender.ID, e.Sender.ID, b.String(), nil, metadata, "direct")
 }
 
-// oaWebhookMaxMediaBytes caps incoming attachment downloads. Matches the
-// 20 MB default used by other channels (telegram, zalo_personal).
 const oaWebhookMaxMediaBytes = 20 * 1024 * 1024
 
-// downloadOAMediaFn is the package-level downloader; tests swap it so
-// httptest loopback URLs aren't blocked by SSRF.
+// downloadOAMediaFn is package-level so tests can swap in a fixture writer
+// that bypasses the SSRF check on httptest loopback URLs.
 var downloadOAMediaFn = downloadOAMedia
 
-// downloadOAMedia fetches a Zalo CDN URL into a temp file. SSRF-checked,
-// size-capped, timeout-bounded. Returns the local path.
 func downloadOAMedia(ctx context.Context, fileURL string) (string, error) {
 	if err := tools.CheckSSRF(fileURL); err != nil {
 		return "", fmt.Errorf("ssrf check: %w", err)
@@ -207,8 +188,6 @@ func downloadOAMedia(ctx context.Context, fileURL string) (string, error) {
 	return tmpFile.Name(), nil
 }
 
-// extFromURL derives a sane file extension from a URL path; falls back to
-// ".bin" for opaque URLs (e.g. CDN links without an extension).
 func extFromURL(fileURL string) string {
 	path := fileURL
 	if i := strings.IndexByte(path, '?'); i >= 0 {
