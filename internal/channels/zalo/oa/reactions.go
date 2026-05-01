@@ -143,6 +143,13 @@ func (c *Channel) OnReactionEvent(ctx context.Context, chatID, messageID, status
 	if chatID == "" || messageID == "" {
 		return nil
 	}
+	// Webhook entry is fenced by router drain; event-bus entry isn't, so
+	// reactionWG.Add can race past Stop()'s Wait without this gate.
+	select {
+	case <-c.stopCh:
+		return nil
+	default:
+	}
 
 	key := chatID + ":" + messageID
 	val, _ := c.reactions.LoadOrStore(key, newZaloReactionController(c, chatID, messageID))
@@ -156,6 +163,13 @@ func (c *Channel) OnReactionEvent(ctx context.Context, chatID, messageID, status
 		// One tombstone per controller — duplicate terminal events used to
 		// each spawn a fresh 60s goroutine.
 		rc.tombstoneOnce.Do(func() {
+			// Re-check stopCh inside Once: Stop() may have closed it
+			// between the entry gate and Add — Add after Wait panics.
+			select {
+			case <-c.stopCh:
+				return
+			default:
+			}
 			c.reactionWG.Add(1)
 			go func() {
 				defer c.reactionWG.Done()

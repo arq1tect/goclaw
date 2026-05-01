@@ -93,6 +93,19 @@ func (c *Channel) getUpdates(timeout int) ([]zaloUpdate, error) {
 		return nil, err
 	}
 
+	if len(result) > 0 && result[0] == '[' {
+		var batch []zaloUpdate
+		if err := json.Unmarshal(result, &batch); err != nil {
+			return nil, fmt.Errorf("unmarshal updates: %w", err)
+		}
+		out := batch[:0]
+		for _, u := range batch {
+			if u.EventName != "" {
+				out = append(out, u)
+			}
+		}
+		return out, nil
+	}
 	var update zaloUpdate
 	if err := json.Unmarshal(result, &update); err != nil {
 		return nil, fmt.Errorf("unmarshal updates: %w", err)

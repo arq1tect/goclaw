@@ -301,6 +301,7 @@ function PasswordOrTextField({
       <Input
         id={id}
         type={field.type === "password" ? "password" : "text"}
+        autoComplete={field.type === "password" ? "new-password" : undefined}
         value={(value as string) ?? ""}
         onChange={(e) => onChange(e.target.value)}
         placeholder={field.placeholder}

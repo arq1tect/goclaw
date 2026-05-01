@@ -130,6 +130,10 @@ func (m *ZaloOAMethods) handleExchangeCode(ctx context.Context, client *gateway.
 	if req.Params != nil {
 		_ = json.Unmarshal(req.Params, &params)
 	}
+	if len(params.InstanceID) > 256 || len(params.Code) > 256 || len(params.OAID) > 256 || len(params.State) > 256 {
+		client.SendResponse(protocol.NewErrorResponse(req.ID, protocol.ErrInvalidRequest, i18n.T(locale, i18n.MsgInvalidRequest, "param too long")))
+		return
+	}
 	instID, err := uuid.Parse(params.InstanceID)
 	if err != nil {
 		client.SendResponse(protocol.NewErrorResponse(req.ID, protocol.ErrInvalidRequest, i18n.T(locale, i18n.MsgInvalidID, "instance")))
@@ -172,9 +176,16 @@ func (m *ZaloOAMethods) handleExchangeCode(ctx context.Context, client *gateway.
 		return
 	}
 	creds.WithTokens(tok)
-	// OAID rides the callback URL (token endpoint omits it). Operator-pasted,
-	// tenant-scoped — mis-paste only mis-tags the operator's own instance.
+	// OAID rides the callback URL (token endpoint omits it). Reject mismatched
+	// paste against an already-bound instance — silently re-tagging swaps
+	// routing metadata onto a different OA until the next failed signature.
 	if params.OAID != "" {
+		if creds.OAID != "" && creds.OAID != params.OAID {
+			slog.Warn("zalo_oa.oaid_mismatch_rejected",
+				"instance_id", instID, "bound_oa_id", creds.OAID, "pasted_oa_id", params.OAID)
+			client.SendResponse(protocol.NewErrorResponse(req.ID, protocol.ErrInvalidRequest, i18n.T(locale, i18n.MsgZaloOAOAIDMismatch)))
+			return
+		}
 		creds.OAID = params.OAID
 	}
 	credsBytes, err := creds.Marshal()

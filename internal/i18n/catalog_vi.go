@@ -232,6 +232,7 @@ func init() {
 		MsgZaloOARedirectURIRequired: "credentials.redirect_uri là bắt buộc và phải khớp chính xác với callback đã đăng ký trong Zalo developer console",
 		MsgZaloOAMissingAppID:        "credentials.app_id là bắt buộc — hãy nhập app_id cho kênh trước khi yêu cầu URL cấp quyền",
 		MsgZaloOAStateGenFailed:      "không thể sinh mã state cấp quyền; vui lòng thử lại",
+		MsgZaloOAOAIDMismatch:        "URL callback thuộc về một OA khác — hãy dán URL lấy từ trang cấp quyền của instance NÀY",
 
 		// RPC URL webhook Zalo
 		MsgZaloWebhookWrongChannelType: "channels.instances.zalo.webhook_url chỉ áp dụng cho instance zalo_bot hoặc zalo_oa",

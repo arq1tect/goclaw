@@ -18,6 +18,7 @@ const (
 )
 
 func (c *Channel) pollLoop(ctx context.Context) {
+	defer c.pollWG.Done()
 	slog.Info("zalo polling loop started")
 
 	for {

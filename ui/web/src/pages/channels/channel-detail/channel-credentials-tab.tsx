@@ -79,7 +79,7 @@ export function ChannelCredentialsTab({ instance, status, onUpdate }: ChannelCre
     setSaving(true);
     try {
       await onUpdate({ credentials: cleanCreds });
-      setValues(initialCredsValues(fields, instance.credentials));
+      setValues({});
     } catch { // toast shown by hook
     } finally {
       setSaving(false);

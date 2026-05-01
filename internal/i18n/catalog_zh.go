@@ -232,6 +232,7 @@ func init() {
 		MsgZaloOARedirectURIRequired: "credentials.redirect_uri 必填,且必须与 Zalo 开发者控制台注册的回调完全一致",
 		MsgZaloOAMissingAppID:        "credentials.app_id 必填 — 请先在通道中设置 app_id 再请求授权 URL",
 		MsgZaloOAStateGenFailed:      "无法生成授权 state 令牌,请重试",
+		MsgZaloOAOAIDMismatch:        "回调 URL 属于另一个 OA — 请粘贴当前实例授权页面的 URL",
 
 		// Zalo Webhook URL RPC
 		MsgZaloWebhookWrongChannelType: "channels.instances.zalo.webhook_url 仅适用于 zalo_bot 或 zalo_oa 类型的实例",

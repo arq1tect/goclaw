@@ -232,6 +232,7 @@ func init() {
 		MsgZaloOARedirectURIRequired: "credentials.redirect_uri is required and must exactly match the callback registered in your Zalo developer console",
 		MsgZaloOAMissingAppID:        "credentials.app_id is required — set it on the channel before requesting the consent URL",
 		MsgZaloOAStateGenFailed:      "failed to generate consent state token; please retry",
+		MsgZaloOAOAIDMismatch:        "callback URL belongs to a different OA — paste the URL from THIS instance's consent page",
 
 		// Zalo webhook URL RPC
 		MsgZaloWebhookWrongChannelType: "channels.instances.zalo.webhook_url only applies to zalo_bot or zalo_oa instances",

@@ -523,6 +523,7 @@ func TestDownloadMedia_SuccessWritesTempFile(t *testing.T) {
 
 	mb := bus.New()
 	ch, _ := New(config.ZaloConfig{Token: "t"}, mb, nil)
+	ch.mediaClient = ch.client // httptest binds to 127.0.0.1; SSRF-safe client blocks loopback.
 	path, err := ch.downloadMedia(srv.URL + "/photo")
 	if err != nil {
 		t.Fatalf("downloadMedia: %v", err)
@@ -549,6 +550,7 @@ func TestDownloadMedia_HTTPErrorReturnsError(t *testing.T) {
 	defer srv.Close()
 
 	ch, _ := New(config.ZaloConfig{Token: "t"}, bus.New(), nil)
+	ch.mediaClient = ch.client
 	if _, err := ch.downloadMedia(srv.URL); err == nil {
 		t.Fatal("expected error on 404, got nil")
 	}
@@ -564,6 +566,7 @@ func TestDownloadMedia_EmptyResponseReturnsError(t *testing.T) {
 	defer srv.Close()
 
 	ch, _ := New(config.ZaloConfig{Token: "t"}, bus.New(), nil)
+	ch.mediaClient = ch.client
 	if _, err := ch.downloadMedia(srv.URL); err == nil {
 		t.Fatal("expected empty-response error, got nil")
 	}
@@ -581,6 +584,7 @@ func TestDownloadMedia_OversizeReturnsError(t *testing.T) {
 	defer srv.Close()
 
 	ch, _ := New(config.ZaloConfig{Token: "t"}, bus.New(), nil)
+	ch.mediaClient = ch.client
 	if _, err := ch.downloadMedia(srv.URL); err == nil {
 		t.Fatal("expected oversize error, got nil")
 	}
@@ -596,6 +600,7 @@ func TestDownloadMedia_FallbackJPEGExtension(t *testing.T) {
 	defer srv.Close()
 
 	ch, _ := New(config.ZaloConfig{Token: "t"}, bus.New(), nil)
+	ch.mediaClient = ch.client
 	path, err := ch.downloadMedia(srv.URL)
 	if err != nil {
 		t.Fatalf("downloadMedia: %v", err)

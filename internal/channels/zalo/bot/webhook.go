@@ -34,8 +34,14 @@ func (c *Channel) HandleWebhookEvent(_ context.Context, raw json.RawMessage) err
 
 	payload := raw
 	var wrap zaloAPIResponse
-	if json.Unmarshal(raw, &wrap) == nil && wrap.OK && len(wrap.Result) > 0 {
-		payload = wrap.Result
+	if json.Unmarshal(raw, &wrap) == nil {
+		switch {
+		case wrap.OK && len(wrap.Result) > 0:
+			payload = wrap.Result
+		case !wrap.OK && wrap.ErrorCode != 0:
+			slog.Debug("zalo_bot.webhook.envelope_not_ok",
+				"instance_id", c.instanceID, "code", wrap.ErrorCode, "desc", wrap.Description)
+		}
 	}
 
 	var u zaloUpdate

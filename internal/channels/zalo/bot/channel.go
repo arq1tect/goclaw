@@ -21,6 +21,7 @@ import (
 	"github.com/nextlevelbuilder/goclaw/internal/channels/zalo/common"
 	"github.com/nextlevelbuilder/goclaw/internal/config"
 	"github.com/nextlevelbuilder/goclaw/internal/store"
+	"github.com/nextlevelbuilder/goclaw/internal/tools"
 )
 
 const (
@@ -36,9 +37,10 @@ type Channel struct {
 	dmPolicy   string
 	mediaMaxMB int
 	blockReply *bool
-	stopCh     chan struct{}
-	client     *http.Client
-	pollClient *http.Client
+	stopCh      chan struct{}
+	client      *http.Client
+	pollClient  *http.Client
+	mediaClient *http.Client
 
 	transport     string // "webhook" (default) | "polling"
 	webhookPath   string // slug suffix appended to /channels/zalo/webhook/
@@ -51,6 +53,7 @@ type Channel struct {
 
 	bootstrapDroppedCount atomic.Int64
 
+	pollWG   sync.WaitGroup
 	stopOnce sync.Once
 
 	legacyPhotoSentinelWarn sync.Once
@@ -112,6 +115,7 @@ func New(cfg config.ZaloConfig, msgBus *bus.MessageBus, pairingSvc store.Pairing
 		stopCh:        make(chan struct{}),
 		client:        &http.Client{Timeout: 60 * time.Second},
 		pollClient:    &http.Client{Timeout: 0},
+		mediaClient:   tools.NewSSRFSafeClient(60 * time.Second),
 		transport:     transport,
 		webhookPath:   cfg.WebhookPath,
 		webhookSecret: cfg.WebhookSecret,
@@ -178,6 +182,7 @@ func (c *Channel) Start(ctx context.Context) error {
 			slog.Warn("zalo_bot.poll.delete_webhook_failed",
 				"instance_id", c.instanceID, "bot_id", c.botID, "err", err)
 		}
+		c.pollWG.Add(1)
 		go c.pollLoop(ctx)
 		c.MarkHealthy("polling")
 	default:
@@ -209,6 +214,7 @@ func (c *Channel) Stop(_ context.Context) error {
 		c.typingCtrls.Delete(key)
 		return true
 	})
+	c.pollWG.Wait()
 	return nil
 }
 
