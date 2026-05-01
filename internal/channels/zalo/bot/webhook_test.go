@@ -69,8 +69,8 @@ func TestBotMessageIDExtractor(t *testing.T) {
 	if got != "m123" {
 		t.Errorf("got %q, want m123", got)
 	}
-	if got := e.ExtractMessageID(json.RawMessage(`{"event_name":"x","message":{"message_id":"m123"}}`)); got != "" {
-		t.Errorf("unwrapped payload should yield empty (got %q)", got)
+	if got := e.ExtractMessageID(json.RawMessage(`{"event_name":"x","message":{"message_id":"m123"}}`)); got != "m123" {
+		t.Errorf("unwrapped payload (Zalo webhook shape) should also extract: got %q", got)
 	}
 	if e.ExtractMessageID(json.RawMessage(`{}`)) != "" {
 		t.Error("missing message_id should yield empty string")

@@ -12,9 +12,10 @@ import (
 	"github.com/nextlevelbuilder/goclaw/internal/channels/zalo/common"
 )
 
-// HandleWebhookEvent unwraps the {ok, result} envelope per
-// bot.zapps.me/docs/apis/webhook; polling already strips it inside
-// callAPIWith.
+// HandleWebhookEvent dispatches a webhook push. Zalo posts the raw event
+// directly (event_name + message at the top level); the {ok, result}
+// envelope is only used by polling getUpdates responses. Accept both
+// shapes so a future API change doesn't silently drop traffic.
 func (c *Channel) HandleWebhookEvent(_ context.Context, raw json.RawMessage) error {
 	if c.inBootstrap() {
 		n := c.bootstrapDroppedCount.Add(1)
@@ -31,16 +32,15 @@ func (c *Channel) HandleWebhookEvent(_ context.Context, raw json.RawMessage) err
 		return nil
 	}
 
+	payload := raw
 	var wrap zaloAPIResponse
-	if err := json.Unmarshal(raw, &wrap); err != nil {
-		return fmt.Errorf("zalo_bot.webhook: decode envelope: %w", err)
+	if json.Unmarshal(raw, &wrap) == nil && wrap.OK && len(wrap.Result) > 0 {
+		payload = wrap.Result
 	}
-	if !wrap.OK || len(wrap.Result) == 0 {
-		return nil
-	}
+
 	var u zaloUpdate
-	if err := json.Unmarshal(wrap.Result, &u); err != nil {
-		return fmt.Errorf("zalo_bot.webhook: decode result: %w", err)
+	if err := json.Unmarshal(payload, &u); err != nil {
+		return fmt.Errorf("zalo_bot.webhook: decode update: %w", err)
 	}
 
 	c.processUpdate(u)
@@ -96,14 +96,20 @@ type botMessageIDExtractor struct{}
 
 func (botMessageIDExtractor) ExtractMessageID(raw json.RawMessage) string {
 	var probe struct {
-		Result struct {
+		Result *struct {
 			Message struct {
 				MessageID string `json:"message_id"`
 			} `json:"message"`
 		} `json:"result"`
+		Message struct {
+			MessageID string `json:"message_id"`
+		} `json:"message"`
 	}
 	if err := json.Unmarshal(raw, &probe); err != nil {
 		return ""
 	}
-	return probe.Result.Message.MessageID
+	if probe.Result != nil && probe.Result.Message.MessageID != "" {
+		return probe.Result.Message.MessageID
+	}
+	return probe.Message.MessageID
 }
