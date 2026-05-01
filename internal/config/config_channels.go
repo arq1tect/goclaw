@@ -155,9 +155,8 @@ type ZaloConfig struct {
 	BlockReply    *bool               `json:"block_reply,omitempty"`  // override gateway block_reply (nil = inherit)
 }
 
-// ZaloOAConfig configures the phone-number-tied Official Account
-// channel that uses Zalo OAuth v4 (oauth.zaloapp.com). Distinct from
-// ZaloConfig (static-token Bot OA) and ZaloPersonalConfig (QR personal).
+// ZaloOAConfig configures the phone-number-tied Official Account channel
+// that uses Zalo OAuth v4 (oauth.zaloapp.com).
 //
 // AppID, SecretKey, and OAID are NOT here — those credentials live in
 // ChannelInstance.credentials (encrypted JSON blob) and are loaded via
@@ -173,15 +172,14 @@ type ZaloOAConfig struct {
 	ReactionLevel        string              `json:"reaction_level,omitempty"`     // "off" (default), "minimal", "full" — status emoji reactions
 	QuoteUserMessage     *bool               `json:"quote_user_message,omitempty"` // default true: quote the user's last inbound message in CS replies
 
-	// Webhook transport (phase 05). Polling is the default.
 	Transport                  string `json:"transport,omitempty"`                     // "polling" (default) | "webhook"
 	WebhookPath                string `json:"webhook_path,omitempty"`                  // per-instance routing slug appended to /channels/zalo/webhook/
-	WebhookSignatureMode       string `json:"webhook_signature_mode,omitempty"`        // "disabled" (default; easier onboarding) | "log_only" | "strict"
+	WebhookSignatureMode       string `json:"webhook_signature_mode,omitempty"`        // "disabled" (default) | "log_only" | "strict"
 	WebhookReplayWindowSeconds int    `json:"webhook_replay_window_seconds,omitempty"` // default 300, clamp [60, 3600]
 	CatchUpOnRestart           bool   `json:"catch_up_on_restart,omitempty"`           // single bounded listrecentchat sweep on Start (off by default)
 
-	// Polling-window resilience (phase 06). Ignored when Transport="webhook".
-	PollCount            int `json:"poll_count,omitempty"`              // listrecentchat page size; default 10, clamp [1, 10] (Zalo API hard cap, error -210 above)
+	// Polling knobs. Ignored when Transport="webhook".
+	PollCount            int `json:"poll_count,omitempty"`              // page size; default 10, clamp [1, 10] (Zalo hard cap, error -210 above)
 	PollBurndownMaxPages int `json:"poll_burndown_max_pages,omitempty"` // max pages per cycle; default 10, clamp [1, 20]; 1 disables burn-down
 }
 
