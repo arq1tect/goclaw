@@ -37,6 +37,33 @@ func (m *AgentsMethods) isOwnerUser(userID string) bool {
 	return canSeeAll(permissions.RoleViewer, m.cfg.Gateway.OwnerIDs, userID)
 }
 
+// authorizePredefinedAgentEdit returns "" if the caller may edit ag, or a
+// localized error message. Open agents bypass the guard.
+func (m *AgentsMethods) authorizePredefinedAgentEdit(ctx context.Context, ag *store.AgentData, method, file string) string {
+	if ag.AgentType != store.AgentTypePredefined {
+		return ""
+	}
+	userID := store.UserIDFromContext(ctx)
+	isAgentOwner := ag.OwnerID == userID
+	isMaster := store.IsMasterScope(ctx) || m.isOwnerUser(userID)
+	if !isAgentOwner && !isMaster {
+		locale := store.LocaleFromContext(ctx)
+		return i18n.T(locale, i18n.MsgOwnerOnly, "edit predefined agent")
+	}
+	if !isAgentOwner && isMaster {
+		attrs := []any{
+			"method", method,
+			"agent_id", ag.ID.String(),
+			"user_id", userID,
+		}
+		if file != "" {
+			attrs = append(attrs, "file", file)
+		}
+		slog.Info("security.master_override", attrs...)
+	}
+	return ""
+}
+
 func (m *AgentsMethods) Register(router *gateway.MethodRouter) {
 	router.Register(protocol.MethodAgent, m.handleAgent)
 	router.Register(protocol.MethodAgentWait, m.handleAgentWait)
