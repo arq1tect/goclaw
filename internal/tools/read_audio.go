@@ -54,9 +54,10 @@ func NewReadAudioTool(registry *providers.Registry, mediaLoader MediaPathLoader)
 func (t *ReadAudioTool) Name() string { return "read_audio" }
 
 func (t *ReadAudioTool) Description() string {
-	return "Analyze audio files (speech, music, sounds) attached to the conversation. " +
-		"Use when you see <media:audio> tags and need to transcribe, summarize, or analyze audio content. " +
-		"Specify what you want to extract or analyze."
+	return "Analyze audio files (speech, music, sounds). Works with: " +
+		"(1) <media:audio> / <media:voice> tags from the conversation (use media_id, or omit for most recent), " +
+		"(2) audio files on disk (pass a file path — required when running via MCP bridge / Claude CLI provider, " +
+		"where the path attribute is included in the media tag)."
 }
 
 func (t *ReadAudioTool) Parameters() map[string]any {
@@ -67,9 +68,13 @@ func (t *ReadAudioTool) Parameters() map[string]any {
 				"type":        "string",
 				"description": "What to analyze. E.g. 'Transcribe this audio', 'Summarize the conversation', 'What language is spoken?'",
 			},
+			"path": map[string]any{
+				"type":        "string",
+				"description": "Optional file path to an audio file. Use the path attribute from the <media:audio> or <media:voice> tag. Takes priority over media_id.",
+			},
 			"media_id": map[string]any{
 				"type":        "string",
-				"description": "Optional: specific media_id from <media:audio> tag. If omitted, uses most recent audio.",
+				"description": "Optional: specific media_id from <media:audio>/<media:voice> tag. Used only when path is not provided. If both omitted, uses most recent audio.",
 			},
 		},
 		"required": []string{"prompt"},
@@ -81,9 +86,10 @@ func (t *ReadAudioTool) Execute(ctx context.Context, args map[string]any) *Resul
 	if prompt == "" {
 		prompt = "Analyze this audio and describe its contents."
 	}
+	pathArg, _ := args["path"].(string)
 	mediaID, _ := args["media_id"].(string)
 
-	audioPath, audioMime, err := t.resolveAudioFile(ctx, mediaID)
+	audioPath, audioMime, err := t.resolveAudioFile(ctx, mediaID, pathArg)
 	if err != nil {
 		return ErrorResult(err.Error())
 	}

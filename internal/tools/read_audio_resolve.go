@@ -12,15 +12,22 @@ import (
 	"github.com/nextlevelbuilder/goclaw/internal/providers"
 )
 
-// resolveAudioFile finds the audio file path from context MediaRefs.
-func (t *ReadAudioTool) resolveAudioFile(ctx context.Context, mediaID string) (path, mime string, err error) {
-	if t.mediaLoader == nil {
+// resolveAudioFile finds the audio file path from explicit path arg, or from context MediaRefs.
+// Priority: pathArg > mediaID lookup in refs > most recent ref.
+func (t *ReadAudioTool) resolveAudioFile(ctx context.Context, mediaID, pathArg string) (path, mime string, err error) {
+	if t.mediaLoader == nil && pathArg == "" {
 		return "", "", fmt.Errorf("no media storage configured — cannot access audio files")
+	}
+
+	// Direct path takes priority — works in MCP bridge / Claude CLI mode where context refs aren't propagated.
+	if pathArg != "" {
+		mime := mimeFromAudioExt(filepath.Ext(pathArg))
+		return pathArg, mime, nil
 	}
 
 	refs := MediaAudioRefsFromCtx(ctx)
 	if len(refs) == 0 {
-		return "", "", fmt.Errorf("no audio files available in this conversation. The user may not have sent an audio file.")
+		return "", "", fmt.Errorf("no audio files available in this conversation. Pass `path` argument from <media:audio>/<media:voice> tag, or send an audio file.")
 	}
 
 	// Sanitize media_id: LLM may pass the literal tag string (e.g. "<media:audio>")

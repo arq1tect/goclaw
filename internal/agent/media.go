@@ -345,8 +345,10 @@ func (l *Loop) enrichDocumentPaths(messages []providers.Message, refs []provider
 	messages[lastIdx].Content = content
 }
 
-// enrichAudioIDs updates the last user message to embed persisted media IDs
-// in <media:audio> and <media:voice> tags so the LLM can reference them.
+// enrichAudioIDs updates the last user message to embed persisted media IDs and
+// file paths in <media:audio> and <media:voice> tags so the LLM can reference them.
+// The path attribute lets tools like read_audio access the file directly without
+// needing MediaAudioRefs context (required for MCP bridge / Claude CLI provider mode).
 func (l *Loop) enrichAudioIDs(messages []providers.Message, refs []providers.MediaRef) {
 	if len(messages) == 0 {
 		return
@@ -369,11 +371,25 @@ func (l *Loop) enrichAudioIDs(messages []providers.Message, refs []providers.Med
 		}
 		idAttr := fmt.Sprintf(" id=%q", ref.ID)
 
+		// Resolve file path (prefer ref.Path, fall back to mediaStore lookup).
+		p := ref.Path
+		if p == "" && l.mediaStore != nil {
+			var err error
+			p, err = l.mediaStore.LoadPath(ref.ID)
+			if err != nil {
+				p = ""
+			}
+		}
+		attrs := idAttr
+		if p != "" {
+			attrs += fmt.Sprintf(" path=%q", p)
+		}
+
 		var replaced bool
 		content, replaced = replaceFirstMediaTag(content, "<media:audio", func(tag string) bool {
 			return !tagHasAttr(tag, "id")
 		}, func(tag string) string {
-			return appendTagAttrs(tag, idAttr)
+			return appendTagAttrs(tag, attrs)
 		})
 		if replaced {
 			continue
@@ -382,7 +398,7 @@ func (l *Loop) enrichAudioIDs(messages []providers.Message, refs []providers.Med
 		content, _ = replaceFirstMediaTag(content, "<media:voice", func(tag string) bool {
 			return !tagHasAttr(tag, "id")
 		}, func(tag string) string {
-			return appendTagAttrs(tag, idAttr)
+			return appendTagAttrs(tag, attrs)
 		})
 	}
 	messages[lastIdx].Content = content
