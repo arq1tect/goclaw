@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"os/exec"
+	"path/filepath"
 	"strings"
 
 	"github.com/nextlevelbuilder/goclaw/internal/providers"
@@ -94,6 +96,23 @@ func (t *ReadAudioTool) Execute(ctx context.Context, args map[string]any) *Resul
 		return ErrorResult(err.Error())
 	}
 
+	// Convert non-mp3/wav formats to mp3 for universal provider compatibility.
+	// OpenAI input_audio API accepts only mp3/wav. Gemini File API and Whisper
+	// transcription both accept mp3 too, so converting once covers all paths.
+	// Telegram voice messages are .ogg/Opus → must be converted.
+	ext := strings.ToLower(filepath.Ext(audioPath))
+	if ext != ".mp3" && ext != ".wav" {
+		converted, convErr := convertAudioToMP3(ctx, audioPath)
+		if convErr != nil {
+			slog.Warn("read_audio: ffmpeg conversion failed, sending original", "ext", ext, "err", convErr)
+		} else {
+			slog.Info("read_audio: converted to mp3", "src", audioPath, "dst", converted)
+			defer os.Remove(converted)
+			audioPath = converted
+			audioMime = "audio/mpeg"
+		}
+	}
+
 	slog.Info("read_audio: resolved file", "path", audioPath, "mime", audioMime, "media_id", mediaID)
 
 	data, err := os.ReadFile(audioPath)
@@ -127,6 +146,36 @@ func (t *ReadAudioTool) Execute(ctx context.Context, args map[string]any) *Resul
 	result.Provider = chainResult.Provider
 	result.Model = chainResult.Model
 	return result
+}
+
+// convertAudioToMP3 converts an audio file to mono 16 kHz mp3 via ffmpeg.
+// Returns the path to a temp file (caller must remove). Used to normalize
+// Telegram voice (.ogg/Opus), .m4a/.aac/.webm, etc. into a format every
+// audio-capable provider accepts (OpenAI input_audio, Gemini, Whisper).
+func convertAudioToMP3(ctx context.Context, srcPath string) (string, error) {
+	if _, err := exec.LookPath("ffmpeg"); err != nil {
+		return "", fmt.Errorf("ffmpeg not on PATH: %w", err)
+	}
+	f, err := os.CreateTemp("", "read_audio_*.mp3")
+	if err != nil {
+		return "", fmt.Errorf("create temp: %w", err)
+	}
+	dstPath := f.Name()
+	f.Close()
+
+	cmd := exec.CommandContext(ctx, "ffmpeg",
+		"-i", srcPath,
+		"-ac", "1", // mono — sufficient for transcription / analysis
+		"-ar", "16000", // 16 kHz — matches Whisper's native rate
+		"-q:a", "5", // VBR q=5, ~96-128 kbps — good speech quality, small files
+		"-loglevel", "error",
+		"-y", dstPath,
+	)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		os.Remove(dstPath)
+		return "", fmt.Errorf("ffmpeg: %w: %s", err, strings.TrimSpace(string(out)))
+	}
+	return dstPath, nil
 }
 
 // mimeFromAudioExt returns MIME type for audio file extensions.
