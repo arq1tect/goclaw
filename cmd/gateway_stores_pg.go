@@ -12,6 +12,7 @@ import (
 	"github.com/nextlevelbuilder/goclaw/internal/store"
 	"github.com/nextlevelbuilder/goclaw/internal/store/pg"
 	"github.com/nextlevelbuilder/goclaw/internal/tracing"
+	"github.com/nextlevelbuilder/goclaw/internal/upgrade"
 )
 
 // setupStoresAndTracing creates PG stores, tracing collector, snapshot worker, and wires cron config.
@@ -28,6 +29,11 @@ func setupStoresAndTracing(
 
 	if err := checkSchemaOrAutoUpgrade(cfg.Database.PostgresDSN); err != nil {
 		slog.Error("schema compatibility check failed", "error", err)
+		os.Exit(1)
+	}
+
+	if err := upgrade.RunCustomMigrations(cfg.Database.PostgresDSN); err != nil {
+		slog.Error("custom migrations failed", "error", err)
 		os.Exit(1)
 	}
 

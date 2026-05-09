@@ -14,6 +14,7 @@ import (
 	"github.com/nextlevelbuilder/goclaw/internal/store/pg"
 	"github.com/nextlevelbuilder/goclaw/internal/store/sqlitestore"
 	"github.com/nextlevelbuilder/goclaw/internal/tracing"
+	"github.com/nextlevelbuilder/goclaw/internal/upgrade"
 )
 
 // setupStoresAndTracing creates stores (PG or SQLite based on config), tracing collector,
@@ -63,6 +64,10 @@ func setupStoresAndTracing(
 		}
 		if err := checkSchemaOrAutoUpgrade(cfg.Database.PostgresDSN); err != nil {
 			slog.Error("schema compatibility check failed", "error", err)
+			os.Exit(1)
+		}
+		if err := upgrade.RunCustomMigrations(cfg.Database.PostgresDSN); err != nil {
+			slog.Error("custom migrations failed", "error", err)
 			os.Exit(1)
 		}
 		storeCfg := store.StoreConfig{
