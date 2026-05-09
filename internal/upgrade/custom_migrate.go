@@ -24,6 +24,14 @@ func RunCustomMigrations(dsn string) error {
 		return nil
 	}
 
+	// Skip when directory is empty (no .sql files yet) — migrate library
+	// returns a non-ErrNoChange error in that case.
+	matches, _ := filepath.Glob(filepath.Join(dir, "*.sql"))
+	if len(matches) == 0 {
+		slog.Info("no custom migration files, skipping", "dir", dir)
+		return nil
+	}
+
 	db, err := sql.Open("pgx", dsn)
 	if err != nil {
 		return fmt.Errorf("custom migrations: connect: %w", err)

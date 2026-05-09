@@ -63,12 +63,11 @@ jobs:
 
           sudo systemctl stop goclaw
           infisical run --projectId=4356f051-f674-41b7-b357-aea58ea96881 --env=dev --domain=https://eu.infisical.com --command "./goclaw migrate up" || true
-          infisical run --projectId=4356f051-f674-41b7-b357-aea58ea96881 --env=dev --domain=https://eu.infisical.com --command "./goclaw custom-migrate up" || true
           sudo systemctl daemon-reload
           sudo systemctl start goclaw
 
           sleep 5
-          if curl -sf http://localhost:18791/ > /dev/null; then
+          if curl -sf http://localhost:18790/health > /dev/null; then
             echo "DEPLOY OK"
           else
             echo "DEPLOY FAILED - rolling back"
