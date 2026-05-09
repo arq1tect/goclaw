@@ -1,0 +1,80 @@
+name: Deploy
+
+on:
+  workflow_call:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+      - run: go build ./...
+      - run: go vet ./...
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: ui/web/pnpm-lock.yaml
+      - run: cd ui/web && pnpm install --frozen-lockfile && pnpm build
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Connect to Tailscale
+        uses: tailscale/github-action@v2
+        with:
+          authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
+
+      - name: Setup SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H 100.66.2.18 >> ~/.ssh/known_hosts 2>/dev/null || true
+
+      - name: Deploy to server
+        run: |
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key wn@100.66.2.18 'bash -s' << 'DEPLOY'
+          set -e
+          cd ~/goclaw
+          export PATH=$PATH:/snap/bin
+
+          PREV_COMMIT=$(git rev-parse HEAD)
+
+          git fetch origin custom
+          git checkout custom
+          git pull origin custom
+
+          go build -o goclaw .
+          cd ui/web && pnpm install && pnpm build && cd ../..
+
+          sudo systemctl stop goclaw
+          infisical run --projectId=4356f051-f674-41b7-b357-aea58ea96881 --env=dev --domain=https://eu.infisical.com --command "./goclaw migrate up" || true
+          infisical run --projectId=4356f051-f674-41b7-b357-aea58ea96881 --env=dev --domain=https://eu.infisical.com --command "./goclaw custom-migrate up" || true
+          sudo systemctl daemon-reload
+          sudo systemctl start goclaw
+
+          sleep 5
+          if curl -sf http://localhost:18791/ > /dev/null; then
+            echo "DEPLOY OK"
+          else
+            echo "DEPLOY FAILED - rolling back"
+            git checkout $PREV_COMMIT
+            go build -o goclaw .
+            sudo systemctl restart goclaw
+            exit 1
+          fi
+          DEPLOY

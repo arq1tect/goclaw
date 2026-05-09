@@ -1,0 +1,120 @@
+name: Upstream Sync
+
+on:
+  schedule:
+    - cron: "0 * * * *"
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: write
+  pull-requests: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    outputs:
+      changed: ${{ steps.changes.outputs.changed }}
+    steps:
+      - name: Checkout fork
+        uses: actions/checkout@v4
+        with:
+          ref: custom
+          fetch-depth: 0
+          token: ${{ secrets.GH_PAT }}
+
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Fetch upstream
+        run: |
+          git remote add upstream https://github.com/nextlevelbuilder/goclaw.git || true
+          git fetch upstream
+          git fetch origin dev || true
+
+      - name: Update dev branch (mirror of upstream/dev)
+        run: |
+          git checkout -B dev upstream/dev
+          git merge --ff-only upstream/dev
+          git remote set-url origin https://x-access-token:${{ secrets.GH_PAT }}@github.com/${{ github.repository }}.git
+          git push origin dev
+
+      - name: Merge dev into custom
+        id: merge
+        run: |
+          git checkout custom
+          if git merge origin/dev --no-edit; then
+            echo "status=clean" >> $GITHUB_OUTPUT
+          else
+            echo "status=conflict" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Check if anything changed
+        id: changes
+        run: |
+          if git diff --quiet origin/custom; then
+            echo "changed=false" >> $GITHUB_OUTPUT
+          else
+            echo "changed=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Push clean merge
+        if: steps.merge.outputs.status == 'clean' && steps.changes.outputs.changed == 'true'
+        run: |
+          git remote set-url origin https://x-access-token:${{ secrets.GH_PAT }}@github.com/${{ github.repository }}.git
+          git push origin custom
+
+      - name: Install Claude CLI
+        if: steps.merge.outputs.status == 'conflict'
+        run: npm install -g @anthropic-ai/claude-code
+
+      - name: Resolve conflicts with Claude
+        if: steps.merge.outputs.status == 'conflict'
+        env:
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+        run: |
+          CONFLICTED=$(git diff --name-only --diff-filter=U)
+          if [ -z "$CONFLICTED" ]; then
+            echo "All conflicts resolved by git merge strategies"
+            git add -A
+            git commit -m "upstream-sync: merge origin/dev (auto-resolved via .gitattributes)"
+          else
+            echo "Conflicts requiring Claude resolution:"
+            echo "$CONFLICTED"
+
+            FORK_DOC=$(cat FORK.md)
+
+            claude -p "You are resolving merge conflicts between origin/dev (mirror of upstream/dev) and our forks custom branch.
+
+          The fork architecture is described in FORK.md (see content below). PRESERVE everything listed there. For every conflicted file: read it, understand both sides, resolve intelligently per the rules in FORK.md, then git add the file. Do not touch unrelated files.
+
+          --- FORK.md ---
+          $FORK_DOC
+          --- end FORK.md ---" \
+                --model claude-opus-4-6 \
+                --allowedTools "Edit,Read,Bash(git add:*),Bash(git diff:*),Bash(git status),Bash(git log:*),Bash(cat:*)" \
+                --max-turns 25 \
+                --verbose
+
+            if grep -rn "<<<<<<< " . --include="*.go" --include="*.tsx" --include="*.ts" --include="*.json" --include="*.sql" --include="*.yml" --include="*.yaml" --include="*.md" --exclude-dir=.github; then
+              echo "ERROR: Unresolved conflict markers remain"
+              exit 1
+            else
+              git add -A
+              git commit -m "upstream-sync: merge origin/dev with conflict resolution"
+            fi
+          fi
+
+      - name: Push resolved merge
+        if: steps.merge.outputs.status == 'conflict'
+        run: |
+          git remote set-url origin https://x-access-token:${{ secrets.GH_PAT }}@github.com/${{ github.repository }}.git
+          git push origin custom
+
+  deploy:
+    needs: sync
+    if: always() && needs.sync.result == 'success' && needs.sync.outputs.changed == 'true'
+    uses: ./.github/workflows/deploy.yml
+    secrets: inherit
