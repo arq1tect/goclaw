@@ -91,3 +91,10 @@ compose.d/*
 *.test
 goclaw-patched-linux-amd64
 ui/web/nginx.staging.conf
+
+# Local Infisical CLI config (project ID + env name; not secret but env-specific)
+.infisical.json
+
+# Build artifacts and rollback binaries (never commit goclaw binary)
+goclaw
+goclaw.backup-*
