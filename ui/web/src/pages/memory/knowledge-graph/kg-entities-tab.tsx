@@ -1,5 +1,5 @@
 import { useState, useMemo, lazy, Suspense } from "react";
-import { Network, Trash2, Search, GitFork, Sparkles, RefreshCw, LayoutGrid, Share2, Merge } from "lucide-react";
+import { Network, Trash2, Search, GitFork, Sparkles, RefreshCw, LayoutGrid, Share2, Merge, Plus, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -10,8 +10,12 @@ import { useTranslation } from "react-i18next";
 import { useDeferredLoading } from "@/hooks/use-deferred-loading";
 import { useKnowledgeGraph, useKGStats, useKGGraph } from "../hooks/use-knowledge-graph";
 import { KGExtractDialog } from "./kg-extract-dialog";
+import { KGEntityFormDialog } from "../kg-entity-form-dialog";
+import { useKgRelationTypes } from "../hooks/use-kg-types";
 import { KGDedupDialog } from "./kg-dedup-dialog";
 import { KGGraphView } from "./kg-graph-view";
+import { KGTypesTab } from "../kg-types-tab";
+import { useKgEntityTypes } from "../hooks/use-kg-types";
 import type { KGEntity } from "@/types/knowledge-graph";
 
 const KGEntityDetailDialog = lazy(() =>
@@ -23,7 +27,7 @@ interface KGEntitiesTabProps {
   userId?: string;
 }
 
-type ViewMode = "table" | "graph";
+type ViewMode = "table" | "graph" | "types";
 
 export function KGEntitiesTab({ agentId, userId }: KGEntitiesTabProps) {
   const { t } = useTranslation("memory");
@@ -34,15 +38,18 @@ export function KGEntitiesTab({ agentId, userId }: KGEntitiesTabProps) {
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [extractOpen, setExtractOpen] = useState(false);
   const [dedupOpen, setDedupOpen] = useState(false);
+  const [formEntity, setFormEntity] = useState<KGEntity | "new" | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>("graph");
 
-  const { entities, loading, fetching, refresh, deleteEntity, getEntityWithRelations, extractFromText } = useKnowledgeGraph({
+  const { entities, loading, fetching, refresh, deleteEntity, getEntityWithRelations, extractFromText, updateEntity, upsertEntity, upsertRelation, deleteRelation } = useKnowledgeGraph({
     agentId,
     userId,
     query: appliedQuery || undefined,
   });
   const { stats } = useKGStats(agentId, userId);
   const graphData = useKGGraph(agentId, userId);
+  const { entityTypes: kgEntityTypes } = useKgEntityTypes(agentId);
+  const { relationTypes: kgRelationTypes } = useKgRelationTypes(agentId);
   const showSkeleton = useDeferredLoading(loading && entities.length === 0);
 
   // Filter graph data by search query (client-side)
@@ -82,6 +89,15 @@ export function KGEntitiesTab({ agentId, userId }: KGEntitiesTabProps) {
   const handleExtract = (text: string, provider: string, model: string) =>
     extractFromText(text, provider, model, userId);
 
+  const handleFormSave = async (data: Record<string, unknown>) => {
+    if (formEntity && formEntity !== "new") {
+      await updateEntity((formEntity as KGEntity).id, data);
+    } else {
+      await upsertEntity(data as Partial<KGEntity>);
+    }
+    setFormEntity(null);
+  };
+
   return (
     <div className="flex h-full flex-col">
       {/* Toolbar row: search + actions */}
@@ -118,9 +134,17 @@ export function KGEntitiesTab({ agentId, userId }: KGEntitiesTabProps) {
             variant={viewMode === "graph" ? "secondary" : "ghost"}
             size="sm"
             onClick={() => setViewMode("graph")}
-            className="h-8 rounded-l-none px-2"
+            className="h-8 rounded-none px-2"
           >
             <Share2 className="h-3.5 w-3.5" />
+          </Button>
+          <Button
+            variant={viewMode === "types" ? "secondary" : "ghost"}
+            size="sm"
+            onClick={() => setViewMode("types")}
+            className="h-8 rounded-l-none px-2"
+          >
+            <Network className="h-3.5 w-3.5" />
           </Button>
         </div>
 
@@ -129,6 +153,9 @@ export function KGEntitiesTab({ agentId, userId }: KGEntitiesTabProps) {
         </Button>
         <Button variant="outline" size="sm" onClick={() => setDedupOpen(true)} className="gap-1 h-8 px-2.5">
           <Merge className="h-3.5 w-3.5" /> {t("kg.dedup.button")}
+        </Button>
+        <Button variant="outline" size="sm" onClick={() => setFormEntity("new")} className="gap-1 h-8 px-2.5">
+          <Plus className="h-3.5 w-3.5" /> {t("kg.newEntity")}
         </Button>
         <Button variant="outline" size="sm" onClick={() => setExtractOpen(true)} className="gap-1 h-8 px-2.5">
           <Sparkles className="h-3.5 w-3.5" /> {t("kg.extract")}
@@ -149,7 +176,9 @@ export function KGEntitiesTab({ agentId, userId }: KGEntitiesTabProps) {
 
       {/* Content area */}
       <div className="min-h-0 flex-1">
-      {viewMode === "graph" ? (
+      {viewMode === "types" ? (
+        <KGTypesTab agentId={agentId} />
+      ) : viewMode === "graph" ? (
         <KGGraphView
           entities={filteredGraphData.entities}
           relations={filteredGraphData.relations}
@@ -201,6 +230,9 @@ export function KGEntitiesTab({ agentId, userId }: KGEntitiesTabProps) {
                       <Button variant="ghost" size="sm" onClick={() => setViewEntity(entity)} className="gap-1">
                         <GitFork className="h-3.5 w-3.5" />
                       </Button>
+                      <Button variant="ghost" size="sm" onClick={() => setFormEntity(entity)} className="gap-1">
+                        <Pencil className="h-3.5 w-3.5" />
+                      </Button>
                       <Button
                         variant="ghost"
                         size="sm"
@@ -227,7 +259,12 @@ export function KGEntitiesTab({ agentId, userId }: KGEntitiesTabProps) {
           onOpenChange={(open) => !open && setViewEntity(null)}
           agentId={agentId}
           entity={viewEntity}
+          userId={userId}
+          allEntities={entities}
+          relationTypes={kgRelationTypes}
           getEntityWithRelations={getEntityWithRelations}
+          upsertRelation={upsertRelation}
+          deleteRelation={deleteRelation}
         />
       </Suspense>
 
@@ -244,6 +281,17 @@ export function KGEntitiesTab({ agentId, userId }: KGEntitiesTabProps) {
         open={extractOpen}
         onOpenChange={setExtractOpen}
         onExtract={handleExtract}
+      />
+
+      {/* Entity create/edit form */}
+      <KGEntityFormDialog
+        open={formEntity !== null}
+        onOpenChange={(open) => !open && setFormEntity(null)}
+        agentId={agentId}
+        userId={userId}
+        entity={formEntity === "new" || formEntity === null ? null : formEntity}
+        entityTypes={kgEntityTypes}
+        onSave={handleFormSave}
       />
 
       {/* Delete confirmation */}

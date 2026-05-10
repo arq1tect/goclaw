@@ -77,7 +77,9 @@ type relationRow struct {
 	TargetEntityID string          `db:"target_entity_id"`
 	Confidence     float64         `db:"confidence"`
 	Properties     json.RawMessage `db:"properties"`
+	Source         string          `db:"source"`
 	CreatedAt      time.Time       `db:"created_at"`
+	UpdatedAt      *time.Time       `db:"updated_at"`
 }
 
 // toRelation converts a relationRow to store.Relation.
@@ -90,7 +92,12 @@ func (r *relationRow) toRelation() store.Relation {
 		RelationType:   r.RelationType,
 		TargetEntityID: r.TargetEntityID,
 		Confidence:     r.Confidence,
+		Source:         r.Source,
 		CreatedAt:      r.CreatedAt.UnixMilli(),
+		UpdatedAt:      0,
+	}
+	if r.UpdatedAt != nil {
+		rel.UpdatedAt = r.UpdatedAt.UnixMilli()
 	}
 	if len(r.Properties) > 0 {
 		_ = json.Unmarshal(r.Properties, &rel.Properties)

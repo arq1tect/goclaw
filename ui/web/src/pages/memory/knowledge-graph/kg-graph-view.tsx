@@ -16,6 +16,7 @@ const DEFAULT_NODE_LIMIT = 2000;
 interface KGGraphViewProps {
   entities: KGEntity[];
   relations: KGRelation[];
+
   onEntityClick?: (entity: KGEntity) => void;
   /** Compact mode for embedded mini-graphs (entity detail dialog) */
   compact?: boolean;

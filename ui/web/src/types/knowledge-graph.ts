@@ -22,6 +22,8 @@ export interface KGRelation {
   target_entity_id: string;
   confidence: number;
   properties?: Record<string, string>;
+  source?: string;
+  updated_at?: number;
   created_at: number;
 }
 
@@ -46,4 +48,42 @@ export interface KGDedupCandidate {
   similarity: number;
   status: string;
   created_at: number;
+}
+
+export interface KGEntityType {
+  id: string;
+  agent_id: string;
+  name: string;
+  display_name: string;
+  color: string;
+  icon?: string;
+  description: string;
+  properties_schema?: KGPropertyField[];
+  is_system: boolean;
+  sort_order: number;
+  created_at: number;
+  updated_at: number;
+}
+
+export interface KGRelationType {
+  id: string;
+  agent_id: string;
+  name: string;
+  display_name: string;
+  color: string;
+  directed: boolean;
+  description: string;
+  properties_schema?: KGPropertyField[];
+  is_system: boolean;
+  sort_order: number;
+  created_at: number;
+  updated_at: number;
+}
+
+export interface KGPropertyField {
+  key: string;
+  label: string;
+  type: "string" | "number" | "date" | "enum";
+  required: boolean;
+  enum_values?: string[];
 }

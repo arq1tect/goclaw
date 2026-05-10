@@ -102,6 +102,108 @@ Risks (informational, not action items):
 - When the new `ProviderAdapter` transport is wired in the agent loop, the
   `userAgent` field needs to flow through `adapter_openai.go:ToRequest`.
 
+### 4. Knowledge Graph extensions
+
+Adds custom entity/relation type management on top of upstream KG: per-agent
+type catalogs with seed presets, dynamic extraction prompt built from DB types,
+and an agent-write tool with configurable guardrails.
+
+**Schema (custom-migrations):**
+
+- `custom-migrations/001_kg_custom_types.up.sql` / `.down.sql` — `kg_entity_types`
+  and `kg_relation_types` tables (per-agent, UNIQUE(agent_id, name),
+  `properties_schema JSONB`, `is_system` flag); `seed_kg_default_types(agent_id)`
+  SQL function with 10 entity + 22 relation defaults; backfill for existing agents.
+- `custom-migrations/002_add_relation_source_updated_at.up.sql` / `.down.sql` —
+  adds `source` and `updated_at` to `kg_relations` for provenance + UI badges.
+
+**Store layer:**
+
+- `internal/store/knowledge_graph_store.go` — interface extended with
+  `GetEntityTypes`, `UpsertEntityType`, `DeleteEntityType`, `CountEntitiesByType`,
+  the relation analogs, and `SeedKGTypes(agentID, preset)`. `UpdateEntity` added.
+- `internal/store/pg/knowledge_graph_types.go` — Postgres implementation.
+  Presets: `general` (10/22 default), `legal` (corporate domain — company,
+  jurisdiction, obligation, risk, decision, contract, document, date, question,
+  person + 10 relations), `development`, `empty` (no-op).
+- `internal/store/pg/knowledge_graph.go`, `_relations.go`, `_scan_rows.go` —
+  extensions for relation source/updated_at and UpdateEntity.
+
+**HTTP API (8 new routes on top of existing 16):**
+
+- `internal/http/knowledge_graph.go` — registers entity-types and relation-types
+  CRUD: `GET/POST/PATCH/DELETE /v1/agents/{agentID}/kg/entity-types[/{typeID}]`
+  and same for `relation-types`.
+- `internal/http/knowledge_graph_types_handlers.go` — handlers with deletion
+  guard (HTTP 409 when type is in use by entities/relations).
+- `internal/http/knowledge_graph_handlers.go` — adds entity update + relation
+  CRUD endpoints.
+
+**Extractor:**
+
+- `internal/knowledgegraph/extractor_prompt_dynamic.go` — `BuildExtractionPrompt`
+  generates the LLM prompt from per-agent types in the DB. Falls back to the
+  static prompt when no custom types are defined.
+- `internal/knowledgegraph/extractor.go` — wired to the dynamic builder. New
+  `NewExtractorWithTypes` constructor. Called from
+  `cmd/gateway_managed.go:buildKGExtractFunc` which loads types per-agent.
+
+**Agent-write tool:**
+
+- `internal/tools/knowledge_graph_mutate.go` — `KnowledgeGraphMutateTool`. Per-run
+  guardrails via builtin_tools settings: `MaxEntitiesPerRun` (default 10),
+  `MaxRelationsPerRun` (default 20), `AllowedEntityTypes` and
+  `AllowedRelationTypes` (CSV whitelist; empty = all). In-process `kgMutateCounter`
+  with mutex enforces limits per (agentID, runID) window.
+- `internal/tools/knowledge_graph_mutate_test.go` — unit tests.
+- `cmd/gateway_builtin_tools.go` — seed entry `knowledge_graph_mutate` (disabled
+  by default; admin enables via dashboard).
+- `cmd/gateway_managed.go` — wires the tool to the KG store on startup.
+- `internal/channels/events.go` — tool status string for chat UI.
+
+**UI (frontend):**
+
+- `ui/web/src/pages/memory/kg-types-tab.tsx` — type management tab.
+- `ui/web/src/pages/memory/kg-type-form-dialog.tsx` — create/edit type with
+  color picker + properties_schema builder.
+- `ui/web/src/pages/memory/kg-entity-form-dialog.tsx`,
+  `kg-relation-form-dialog.tsx` — direct entity/relation CRUD UI.
+- `ui/web/src/pages/memory/hooks/use-kg-types.ts`,
+  `hooks/use-knowledge-graph.ts` — react-query hooks.
+- `ui/web/src/pages/builtin-tools/kg-mutate-settings-form.tsx` — guardrail
+  config UI.
+- `ui/web/src/pages/memory/knowledge-graph/kg-entities-tab.tsx`,
+  `kg-entity-detail-dialog.tsx`, `kg-graph-view.tsx` — extended with type-aware
+  rendering (dynamic colors, icons, badges).
+- `ui/web/src/types/knowledge-graph.ts`, `lib/query-keys.ts` — shared types
+  and query keys.
+- `ui/web/src/i18n/locales/{en,vi,zh}/{memory,storage,tools}.json` — translations.
+
+**Conflict resolution rules:**
+
+- Schema (`custom-migrations/001_*`, `002_*`) — never renumber, move, or merge
+  with upstream migrations.
+- `KnowledgeGraphStore` interface (`internal/store/knowledge_graph_store.go`) —
+  preserve all type-management methods. If upstream extends the interface, keep
+  both sides.
+- Extractor — if upstream changes the static prompt or extractor signature,
+  preserve `BuildExtractionPrompt`'s call site in `extractor.go` and the
+  `NewExtractorWithTypes` constructor.
+- `knowledge_graph_mutate.go` and its registration in `gateway_managed.go` —
+  keep the wiring block. The tool is gated by builtin_tools enabled flag.
+- Settings defaults (`kgMutateSettings.MaxEntitiesPerRun=10`,
+  `MaxRelationsPerRun=20`) — change cautiously; production tuning happens via
+  dashboard.
+
+**Tools that agents see:**
+
+- `knowledge_graph_search` (read-only, search/list/traverse) — present in
+  upstream, description references the dynamic per-agent type catalog.
+- `knowledge_graph_mutate` (write) — fork-only. Disabled by default. Admin
+  enables per-tenant via dashboard. Tool description and the dynamic
+  extractor prompt together communicate to agents what types are available
+  and how to propose new ones.
+
 ## Conflict Resolution Rules
 
 1. **`custom-migrations/`** — never rename, renumber, move, or delete.

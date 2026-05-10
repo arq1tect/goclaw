@@ -390,6 +390,12 @@ func wireExtras(
 				kgt.SetKGStore(stores.KnowledgeGraph)
 			}
 		}
+		// Wire knowledge graph mutate tool
+		if kgMutTool, ok := toolsReg.Get("knowledge_graph_mutate"); ok {
+			if kgt, ok := kgMutTool.(*tools.KnowledgeGraphMutateTool); ok {
+				kgt.SetKGStore(stores.KnowledgeGraph)
+			}
+		}
 		// Enable KG hint in memory_search results
 		if searchTool, ok := toolsReg.Get("memory_search"); ok {
 			if mst, ok := searchTool.(*tools.MemorySearchTool); ok {
@@ -722,7 +728,15 @@ func buildKGExtractFunc(kgStore store.KnowledgeGraphStore, bts store.BuiltinTool
 			slog.Warn("kg extract: provider not found", "provider", settings.ExtractionProvider, "error", err)
 			return
 		}
-		extractor := kg.NewExtractor(p, settings.ExtractionModel, settings.MinConfidence)
+		// Load custom types from DB for dynamic prompt
+		entityTypes, _ := kgStore.GetEntityTypes(ctx, agentID)
+		relationTypes, _ := kgStore.GetRelationTypes(ctx, agentID)
+		var extractor *kg.Extractor
+		if len(entityTypes) > 0 {
+			extractor = kg.NewExtractorWithTypes(p, settings.ExtractionModel, settings.MinConfidence, entityTypes, relationTypes)
+		} else {
+			extractor = kg.NewExtractor(p, settings.ExtractionModel, settings.MinConfidence)
+		}
 		result, err := extractor.Extract(ctx, content)
 		if err != nil {
 			slog.Warn("kg extract: extraction failed", "agent", agentID, "error", err)

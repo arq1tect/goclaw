@@ -17,7 +17,8 @@
   },
   "tabs": {
     "documents": "Documents",
-    "knowledgeGraph": "Knowledge Graph"
+    "knowledgeGraph": "Knowledge Graph",
+    "episodic": "Episodic Memory"
   },
   "columns": {
     "path": "Path",
@@ -162,8 +163,11 @@
         "direction": "Direction",
         "relation": "Relation",
         "target": "Target",
-        "confidence": "Confidence"
-      }
+        "confidence": "Confidence",
+        "actions": "Actions",
+        "source": "Source"
+      },
+      "addRelation": "Add Relation"
     },
     "extractDialog": {
       "title": "Extract Entities from Text",
@@ -185,6 +189,40 @@
       "selected": "Selected: {{name}}",
       "limitNote": "Showing top {{limit}} of {{total}} entities",
       "limitHint": "Graph is limited to {{limit}} entities for performance. Use the table view to browse all {{total}} entities."
+    },
+    "entityForm": {
+      "titleCreate": "Create Entity",
+      "titleEdit": "Edit Entity",
+      "name": "Name",
+      "externalId": "External ID",
+      "entityType": "Entity Type",
+      "description": "Description",
+      "confidence": "Confidence",
+      "cancel": "Cancel",
+      "create": "Create",
+      "save": "Save"
+    },
+    "relationForm": {
+      "title": "Add Relation",
+      "direction": "Direction",
+      "outgoing": "Outgoing (→)",
+      "incoming": "Incoming (←)",
+      "targetEntity": "Target Entity",
+      "relationType": "Relation Type",
+      "confidence": "Confidence",
+      "cancel": "Cancel",
+      "add": "Add"
+    },
+    "deleteRelation": {
+      "title": "Delete Relation",
+      "description": "Are you sure you want to delete this relation?",
+      "confirmLabel": "Delete"
+    },
+    "newEntity": "New Entity",
+    "source": {
+      "manual": "Manual",
+      "extraction": "Extraction",
+      "agent": "Agent"
     }
   },
   "toast": {
@@ -213,11 +251,13 @@
     "allIndexed": "All documents indexed",
     "allIndexFailed": "Failed to index all",
     "searchFailed": "Search failed",
-    "docLoadFailed": "Failed to load document"
-  },
-  "tabs": {
-    "documents": "Documents",
-    "episodic": "Episodic Memory"
+    "docLoadFailed": "Failed to load document",
+    "entityUpdated": "Entity updated",
+    "entityUpdateFailed": "Failed to update entity",
+    "relationSaved": "Relation saved",
+    "relationSaveFailed": "Failed to save relation",
+    "relationDeleted": "Relation deleted",
+    "relationDeleteFailed": "Failed to delete relation"
   },
   "episodic": {
     "noData": "No episodic memories yet",

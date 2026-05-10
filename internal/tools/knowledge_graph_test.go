@@ -65,6 +65,9 @@ func (m *mockKGStore) SearchEntities(_ context.Context, _, _, query string, limi
 }
 
 func (m *mockKGStore) UpsertRelation(_ context.Context, r *store.Relation) error {
+	if r.Source == "" {
+		r.Source = "manual"
+	}
 	m.relations = append(m.relations, *r)
 	return nil
 }
@@ -119,6 +122,61 @@ func (m *mockKGStore) DismissCandidate(context.Context, string, string) error {
 
 func (m *mockKGStore) Stats(context.Context, string, string) (*store.GraphStats, error) {
 	return &store.GraphStats{}, nil
+}
+
+
+func (m *mockKGStore) GetEntityTypes(context.Context, string) ([]store.EntityType, error) {
+	return nil, nil
+}
+
+func (m *mockKGStore) UpsertEntityType(context.Context, *store.EntityType) error {
+	return nil
+}
+
+func (m *mockKGStore) DeleteEntityType(context.Context, string, string) error {
+	return nil
+}
+
+func (m *mockKGStore) GetRelationTypes(context.Context, string) ([]store.RelationType, error) {
+	return nil, nil
+}
+
+func (m *mockKGStore) UpsertRelationType(context.Context, *store.RelationType) error {
+	return nil
+}
+
+func (m *mockKGStore) DeleteRelationType(context.Context, string, string) error {
+	return nil
+}
+
+func (m *mockKGStore) SeedKGTypes(context.Context, string, string) error {
+	return nil
+}
+
+func (m *mockKGStore) CountEntitiesByType(context.Context, string, string) (int64, error) {
+	return 0, nil
+}
+
+func (m *mockKGStore) CountRelationsByType(context.Context, string, string) (int64, error) {
+	return 0, nil
+}
+
+func (m *mockKGStore) UpdateEntity(_ context.Context, _, _, entityID string, updates map[string]any) (*store.Entity, error) {
+	e, ok := m.entities[entityID]
+	if !ok {
+		return nil, fmt.Errorf("entity not found: %s", entityID)
+	}
+	if v, ok := updates["name"].(string); ok {
+		e.Name = v
+	}
+	if v, ok := updates["description"].(string); ok {
+		e.Description = v
+	}
+	if v, ok := updates["entity_type"].(string); ok {
+		e.EntityType = v
+	}
+	m.entities[entityID] = e
+	return &e, nil
 }
 
 func (m *mockKGStore) SetEmbeddingProvider(store.EmbeddingProvider) {}

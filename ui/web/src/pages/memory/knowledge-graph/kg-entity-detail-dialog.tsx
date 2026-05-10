@@ -8,7 +8,10 @@ import {
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { GitFork } from "lucide-react";
+import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+import { GitFork, Plus, Trash2 } from "lucide-react";
+import { KGRelationFormDialog } from "../kg-relation-form-dialog";
+import type { KGRelationType } from "@/types/knowledge-graph";
 import { useTranslation } from "react-i18next";
 import { useHttp } from "@/hooks/use-ws";
 import { useKGDetailStore } from "@/stores/use-kg-detail-store";
@@ -22,14 +25,22 @@ interface KGEntityDetailDialogProps {
   onOpenChange: (open: boolean) => void;
   agentId: string;
   entity: KGEntity | null;
+  userId?: string;
+  allEntities: KGEntity[];
+  relationTypes: KGRelationType[];
   getEntityWithRelations: (entityId: string, userId?: string) => Promise<{ entity: KGEntity; relations: KGRelation[] }>;
+  upsertRelation: (data: { source_entity_id: string; target_entity_id: string; relation_type: string; confidence?: number }, userId?: string) => Promise<void>;
+  deleteRelation: (relationId: string, userId?: string) => Promise<void>;
 }
 
-export function KGEntityDetailDialog({ open, onOpenChange, agentId, entity, getEntityWithRelations }: KGEntityDetailDialogProps) {
+export function KGEntityDetailDialog({ open, onOpenChange, agentId, entity, userId, allEntities, relationTypes, getEntityWithRelations, upsertRelation, deleteRelation }: KGEntityDetailDialogProps) {
   const { t } = useTranslation("memory");
   const http = useHttp();
   const [relations, setRelations] = useState<KGRelation[]>([]);
   const [loadingRels, setLoadingRels] = useState(false);
+  const [addRelOpen, setAddRelOpen] = useState(false);
+  const [deleteRelTarget, setDeleteRelTarget] = useState<KGRelation | null>(null);
+  const [deleteRelLoading, setDeleteRelLoading] = useState(false);
 
   // Dedicated store — isolated from main graph query cache
   const traversalResults = useKGDetailStore((s) => s.traversalResults);
@@ -84,6 +95,29 @@ export function KGEntityDetailDialog({ open, onOpenChange, agentId, entity, getE
       loadRelations();
     }
   }, [open, entity, loadRelations]);
+
+  const entityLookup = useMemo(() => {
+    const map = new Map<string, KGEntity>();
+    for (const e of allEntities) map.set(e.id, e);
+    return map;
+  }, [allEntities]);
+
+  const handleRelationSave = useCallback(async (data: { source_entity_id: string; target_entity_id: string; relation_type: string; confidence: number }) => {
+    await upsertRelation(data, userId);
+    await loadRelations();
+  }, [upsertRelation, userId, loadRelations]);
+
+  const handleDeleteRelation = useCallback(async () => {
+    if (!deleteRelTarget) return;
+    setDeleteRelLoading(true);
+    try {
+      await deleteRelation(deleteRelTarget.id, userId);
+      setDeleteRelTarget(null);
+      await loadRelations();
+    } finally {
+      setDeleteRelLoading(false);
+    }
+  }, [deleteRelTarget, deleteRelation, userId, loadRelations]);
 
   const handleTraverse = useCallback(() => {
     if (!entity) return;
@@ -172,6 +206,10 @@ export function KGEntityDetailDialog({ open, onOpenChange, agentId, entity, getE
             <div className="flex items-center justify-between mb-2">
               <h4 className="text-sm font-medium">{t("kg.entity.relations")}</h4>
               <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" onClick={() => setAddRelOpen(true)} className="gap-1">
+                  <Plus className="h-3.5 w-3.5" />
+                  {t("kg.entity.addRelation")}
+                </Button>
                 <select
                   value={depth}
                   onChange={(e) => setDepth(Number(e.target.value))}
@@ -202,7 +240,7 @@ export function KGEntityDetailDialog({ open, onOpenChange, agentId, entity, getE
                 ) : relations.length === 0 ? (
                   <p className="text-xs text-muted-foreground">{t("kg.entity.noRelations")}</p>
                 ) : (
-                  <RelationsTable relations={relations} entityId={entity?.id} t={t} />
+                  <RelationsTable relations={relations} entityId={entity?.id} entityLookup={entityLookup} onDeleteRel={setDeleteRelTarget} t={t} />
                 )}
 
                 {/* Traversal results */}
@@ -251,6 +289,29 @@ export function KGEntityDetailDialog({ open, onOpenChange, agentId, entity, getE
           </div>
         </div>
       </DialogContent>
+    {/* Add relation dialog */}
+      {entity && (
+        <KGRelationFormDialog
+          open={addRelOpen}
+          onOpenChange={setAddRelOpen}
+          sourceEntityId={entity.id}
+          entities={allEntities}
+          relationTypes={relationTypes}
+          onSave={handleRelationSave}
+        />
+      )}
+
+      {/* Delete relation confirmation */}
+      <ConfirmDialog
+        open={!!deleteRelTarget}
+        onOpenChange={(open) => !open && setDeleteRelTarget(null)}
+        title={t("kg.deleteRelation.title")}
+        description={t("kg.deleteRelation.description")}
+        confirmLabel={t("kg.deleteRelation.confirmLabel")}
+        variant="destructive"
+        onConfirm={handleDeleteRelation}
+        loading={deleteRelLoading}
+      />
     </Dialog>
   );
 }
@@ -259,10 +320,14 @@ export function KGEntityDetailDialog({ open, onOpenChange, agentId, entity, getE
 const RelationsTable = React.memo(function RelationsTable({
   relations,
   entityId,
+  entityLookup,
+  onDeleteRel,
   t,
 }: {
   relations: KGRelation[];
   entityId: string | undefined;
+  entityLookup: Map<string, KGEntity>;
+  onDeleteRel: (rel: KGRelation) => void;
   t: (key: string) => string;
 }) {
   const INITIAL_LIMIT = 50;
@@ -279,6 +344,7 @@ const RelationsTable = React.memo(function RelationsTable({
             <th className="px-3 py-2 text-left font-medium">{t("kg.entity.columns.relation")}</th>
             <th className="px-3 py-2 text-left font-medium">{t("kg.entity.columns.target")}</th>
             <th className="px-3 py-2 text-left font-medium">{t("kg.entity.columns.confidence")}</th>
+            <th className="px-3 py-2 text-right font-medium">{t("kg.entity.columns.actions")}</th>
           </tr>
         </thead>
         <tbody>
@@ -289,11 +355,27 @@ const RelationsTable = React.memo(function RelationsTable({
                   ? t("kg.entity.direction.outgoing")
                   : t("kg.entity.direction.incoming")}
               </td>
-              <td className="px-3 py-2 font-mono">{rel.relation_type}</td>
-              <td className="px-3 py-2 font-mono text-muted-foreground">
-                {rel.source_entity_id === entityId ? rel.target_entity_id.slice(0, 8) : rel.source_entity_id.slice(0, 8)}
+              <td className="px-3 py-2">
+                  <span className="font-mono">{rel.relation_type}</span>
+                  {rel.source && (
+                    <Badge variant="outline" className={"ml-1 text-[10px] " + (
+                      rel.source === "manual" ? "border-blue-400 text-blue-500" :
+                      rel.source === "extraction" ? "border-green-400 text-green-500" :
+                      "border-orange-400 text-orange-500"
+                    )}>{rel.source}</Badge>
+                  )}
+                </td>
+              <td className="px-3 py-2">
+                {rel.source_entity_id === entityId
+                  ? (entityLookup.get(rel.target_entity_id)?.name ?? rel.target_entity_id.slice(0, 8))
+                  : (entityLookup.get(rel.source_entity_id)?.name ?? rel.source_entity_id.slice(0, 8))}
               </td>
               <td className="px-3 py-2">{Math.round(rel.confidence * 100)}%</td>
+              <td className="px-3 py-2 text-right">
+                <Button variant="ghost" size="sm" onClick={() => onDeleteRel(rel)} className="gap-1 text-destructive hover:text-destructive h-7 w-7 p-0">
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Button>
+              </td>
             </tr>
           ))}
         </tbody>
