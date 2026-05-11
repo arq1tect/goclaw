@@ -153,12 +153,13 @@ func (t *KnowledgeGraphMutateTool) SetKGStore(ks store.KnowledgeGraphStore) {
 func (t *KnowledgeGraphMutateTool) Name() string { return "knowledge_graph_mutate" }
 
 func (t *KnowledgeGraphMutateTool) Description() string {
-	return "Create or update entities and relations in the knowledge graph. " +
-		"Use when you need to record new information about people, projects, or their connections " +
-		"that you discover during conversation. " +
-		"IMPORTANT: Always search first with knowledge_graph_search to avoid creating duplicates. " +
-		"Actions: create_entity, update_entity, create_relation, delete_relation. " +
-		"All items created through this tool are tagged as agent-sourced."
+	return "Create or update entities and relations in the knowledge graph to retain factual information discovered in conversation.\n\n" +
+		"IMPORTANT: Search first with knowledge_graph_search to avoid duplicates.\n\n" +
+		"Use entity and relation types from this agent's catalog (preset-dependent; see CAPABILITIES). " +
+		"If you need a type not in the catalog — you may propose a new one. Activate skill `kg-ontology` for the proposal protocol (anti-fragmentation review + explicit user approval). " +
+		"Do NOT force a wrong fit (e.g. using 'concept' for a Contract, or 'document' for a Visa).\n\n" +
+		"Rate limits: 10 entities and 20 relations per run by default (configurable per agent in builtin-tools settings).\n\n" +
+		"Actions: create_entity, update_entity, create_relation, delete_relation. Items are tagged agent-sourced."
 }
 
 func (t *KnowledgeGraphMutateTool) Parameters() map[string]any {
@@ -180,7 +181,7 @@ func (t *KnowledgeGraphMutateTool) Parameters() map[string]any {
 			},
 			"entity_type": map[string]any{
 				"type":        "string",
-				"description": "Entity type: person, organization, project, product, technology, task, event, document, concept, location",
+				"description": "Entity type from this agent's catalog (preset-dependent; see CAPABILITIES). Common examples for legal preset: Person, Company, Jurisdiction, Contract, Document, Obligation, Risk, Decision, BankAccount, BeneficialOwner, TaxResidence. Personal preset adds: Visa, Residence. If you need a type not in your catalog, activate skill `kg-ontology` to propose it — do not force a wrong fit.",
 			},
 			"description": map[string]any{
 				"type":        "string",
@@ -188,7 +189,7 @@ func (t *KnowledgeGraphMutateTool) Parameters() map[string]any {
 			},
 			"relation_type": map[string]any{
 				"type":        "string",
-				"description": "Type of relation (e.g. works_for, manages, related_to)",
+				"description": "Relation type from this agent's catalog (preset-dependent). Common examples: registered_in, owns, holds_account_at, tax_resident_in, governs, expires_on, mitigates, has_role, is_director_of, holds_passport_of, resident_in. New relation types require skill `kg-ontology` governance (anti-fragmentation review + explicit user approval).",
 			},
 			"source_entity_id": map[string]any{
 				"type":        "string",

@@ -30,7 +30,9 @@ func (t *KnowledgeGraphSearchTool) SetKGStore(ks store.KnowledgeGraphStore) {
 func (t *KnowledgeGraphSearchTool) Name() string { return "knowledge_graph_search" }
 
 func (t *KnowledgeGraphSearchTool) Description() string {
-	return "Search the knowledge graph to find people, projects, organizations, and how they connect. Better than memory_search when you need: who works with whom, what projects someone is involved in, dependencies between tasks, or any multi-hop relationship question. Use specific names (e.g. 'Minh', 'GoClaw') — not generic words. Use query='*' to list all known entities. Use entity_id to traverse connections from a specific entity."
+	return "Search the knowledge graph for entities (people, companies, jurisdictions, contracts, banks, etc.) and their relations. Better than memory_search for multi-hop relationship questions, type-filtered lookups, or discovering what's in the graph.\n\n" +
+		"Use query='*' to list all entities. Use entity_id to traverse from a specific entity. Use as_of for point-in-time queries.\n\n" +
+		"Entity and relation types available to you depend on your catalog (preset-dependent; see CAPABILITIES). If you need a type not yet in your catalog, you may propose a new one — activate skill `kg-ontology` for the proposal protocol (anti-fragmentation review + explicit user approval)."
 }
 
 func (t *KnowledgeGraphSearchTool) Parameters() map[string]any {
@@ -43,7 +45,7 @@ func (t *KnowledgeGraphSearchTool) Parameters() map[string]any {
 			},
 			"entity_type": map[string]any{
 				"type":        "string",
-				"description": "Filter by entity type (person, organization, project, product, technology, task, event, document, concept, location)",
+				"description": "Filter by entity type from this agent's catalog. Catalog is preset-dependent — see CAPABILITIES for the current list. Common examples (legal preset): Person, Company, Jurisdiction, Contract, Document, Obligation, Risk, Decision, BankAccount, BeneficialOwner; (personal preset adds): Visa, Residence. If you need a type not in your catalog, propose it via skill `kg-ontology` rather than forcing a wrong fit.",
 			},
 			"entity_id": map[string]any{
 				"type":        "string",

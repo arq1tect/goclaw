@@ -204,6 +204,40 @@ and an agent-write tool with configurable guardrails.
   extractor prompt together communicate to agents what types are available
   and how to propose new ones.
 
+**Tool descriptions overhaul (2026-05-11) — fork-specific:**
+
+Upstream descriptions for `knowledge_graph_search` and `knowledge_graph_mutate`
+hardcode the generic 10-type vocabulary (`person, organization, project,
+product, technology, task, event, document, concept, location`) in three
+places, which misdirects the LLM toward generic types even when a custom
+per-agent catalog (e.g. legal preset) is active. The fork rewrites these
+descriptions to reference the per-agent catalog and the `kg-ontology` skill
+governance for new types.
+
+Touched in three places — preserve all three on upstream merges:
+
+- `internal/agent/systemprompt.go` — `coreToolSummaries` map: updated
+  `knowledge_graph_search` summary; **added** `knowledge_graph_mutate` summary
+  (upstream omits it entirely, falling back to `(custom tool)`).
+- `internal/tools/knowledge_graph.go` — `Description()` and the `entity_type`
+  parameter description.
+- `internal/tools/knowledge_graph_mutate.go` — `Description()`, `entity_type`
+  parameter description, `relation_type` parameter description.
+
+Rationale: parameter schemas (formal contract) dominate over system prompt
+text (informal) when the LLM picks attribute values. Without this overhaul,
+McGill/Saul agents default to `concept`/`document` types and ignore the
+legal/personal preset catalog. Fixing only `CAPABILITIES.md` (system prompt
+side) leaves the parameter schemas conflicting — agents see two contradictory
+sources.
+
+The new descriptions explicitly:
+- Reference `your agent's catalog (preset-dependent; see CAPABILITIES)`.
+- Give example types from both legal and personal presets.
+- Direct agents to the `kg-ontology` skill for proposing new types.
+- Surface rate limits (10 entities / 20 relations per run) in the mutate
+  description.
+
 ## Conflict Resolution Rules
 
 1. **`custom-migrations/`** — never rename, renumber, move, or delete.
@@ -229,5 +263,12 @@ and an agent-write tool with configurable guardrails.
 7. **i18n files** (`ui/web/src/i18n/locales/`) — preserve our custom translation keys
    while adding upstream new keys.
 
-8. **All other conflicts** — keep BOTH sides. Merge logically. Prefer the version
+8. **KG tool descriptions** — preserve fork rewrites of `Description()` and parameter
+   descriptions in `internal/tools/knowledge_graph.go` and
+   `internal/tools/knowledge_graph_mutate.go`, plus the `coreToolSummaries` entries
+   in `internal/agent/systemprompt.go`. Upstream descriptions hardcode generic
+   10-type vocabulary; fork references per-agent catalog and `kg-ontology` skill.
+   See "Tool descriptions overhaul (2026-05-11)" above.
+
+9. **All other conflicts** — keep BOTH sides. Merge logically. Prefer the version
    that compiles and passes tests.
