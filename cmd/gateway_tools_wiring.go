@@ -155,5 +155,14 @@ func wireExtraTools(
 	toolsReg.Register(agentCtxFilesTool)
 	slog.Info("agent_context_files tool registered (agent store wired)")
 
+	// agent_config tool (fork): read + patch-update agent configuration.
+	// Needs agent store + msgBus (for cache invalidation and status change
+	// broadcasts that mirror handleUpdate's side effects).
+	agentConfigTool := tools.NewAgentConfigTool()
+	agentConfigTool.SetAgentStore(pgStores.Agents)
+	agentConfigTool.SetMessageBus(msgBus)
+	toolsReg.Register(agentConfigTool)
+	slog.Info("agent_config tool registered (agent store + msgBus wired)")
+
 	return heartbeatTool, hasMemory
 }

@@ -307,3 +307,30 @@ Conflict-resolution rules:
 - The `DeleteAgentContextFile` interface addition is upstream-additive — no existing methods modified. New implementations need not be backported if upstream picks up a different design.
 - The local `allowedContextFiles` list in `agent_context_files.go` intentionally duplicates (rather than imports) the allowlist used by `gateway/methods/agents_files.go` — keeps the tool free of cross-file coupling for merge stability. If upstream adds a new bootstrap file we want exposed, add it explicitly to the tool's list.
 - The `protectedFromDeletion` set is a tool-local guard. There is no system-wide delete protection on context files in upstream as of this writing; if upstream adds one, our tool guard becomes redundant and can be removed.
+
+### `agent_config` (agent administration family, second tool)
+
+Read + patch-update of any agent's configuration in the caller's tenant.
+Mirrors HTTP `PUT /v1/agents/{id}` (`internal/http/agents.go::handleUpdate`)
+including its side effects, but as an in-process builtin tool — no HTTP
+round-trip, no API key needed.
+
+Sub-actions: `read`, `update`.
+
+Files:
+- `internal/tools/agent_config.go` — tool implementation (~530 lines).
+- `internal/tools/agent_config_test.go` — unit tests (24 cases incl. dispatch, validation, JSONB shape, identity sync, rename, error paths).
+- `cmd/gateway_tools_wiring.go` — registers the tool and wires `pgStores.Agents` + `msgBus`.
+- `cmd/gateway_builtin_tools.go` — adds `agent_config` builtin entry (`Enabled: false` default, category `admin`).
+
+Side effects replicated from `handleUpdate`:
+- Cache invalidation: `bus.EventCacheInvalidate` for `CacheKindAgent` (old agent_key, and new on rename) + `CacheKindBootstrap` for the agent UUID.
+- `IDENTITY.md` `Name:` field sync via `bootstrap.UpdateIdentityField` when `display_name` changes.
+- `bus.EventAgentStatusChanged` broadcast on status change.
+
+Conflict-resolution rules:
+- `agentConfigMutableFields` in the tool is a curated copy of `agentAllowedFields` from `internal/http/validate.go` with `agent_type` intentionally excluded (treated as immutable here). If upstream adds new fields to its allowlist, decide per-field whether to expose via this tool.
+- `agentConfigSlugRe` duplicates `slugRe` from `internal/http/validate.go` to avoid tools→http dependency. They must stay in sync; if upstream tightens the slug regex, mirror here.
+- `status` settable values exclude `summoning` (reserved for the async summoner). If upstream adds new lifecycle states, evaluate whether they should be operator-settable.
+- The tool relies on `store.AgentStore.Update` to atomically handle the `is_default` uniqueness side effect (the PG implementation clears `is_default` on other agents in the tenant when one is set). If upstream changes this contract, the tool needs explicit handling.
+- `msgBus` wiring is optional in the constructor for testability; production gateway always wires it.
