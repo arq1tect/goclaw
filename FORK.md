@@ -334,3 +334,43 @@ Conflict-resolution rules:
 - `status` settable values exclude `summoning` (reserved for the async summoner). If upstream adds new lifecycle states, evaluate whether they should be operator-settable.
 - The tool relies on `store.AgentStore.Update` to atomically handle the `is_default` uniqueness side effect (the PG implementation clears `is_default` on other agents in the tenant when one is set). If upstream changes this contract, the tool needs explicit handling.
 - `msgBus` wiring is optional in the constructor for testability; production gateway always wires it.
+
+### `agent_provision` (agent administration family, third tool)
+
+The central admin tool: create, delete, and list agents in the caller's
+tenant. Create is atomic — agent record + bootstrap seed + operator
+context-file overlay in one call. No HTTP round-trip, no summoner trigger.
+
+Sub-actions: `create`, `delete`, `list`.
+
+Files:
+- `internal/tools/agent_provision.go` — tool implementation (~530 lines).
+- `internal/tools/agent_provision_test.go` — unit tests (27 cases incl. dispatch, validation, context-file allowlist, default workspace fallback, store errors, create+delete round trip).
+- `cmd/gateway_tools_wiring.go` — registers the tool and wires `pgStores.Agents` + `msgBus` + `agentCfg.Workspace` (for default workspace path).
+- `cmd/gateway_builtin_tools.go` — adds `agent_provision` builtin entry (`Enabled: false` default, category `admin`).
+
+Create flow (atomic):
+1. Validate agent_key slug + uniqueness, provider presence, enum values, JSONB shapes.
+2. Construct `store.AgentData` with defaults (agent_type=predefined, status=active, restrict_to_workspace=true, memory_config={"enabled":true}, compaction_config={}).
+3. `agentStore.Create(ctx, ag)` — gets UUID.
+4. `bootstrap.SeedToStore(ctx, agentStore, id, predefined)` — seeds default templates for files we did NOT provide (AGENTS_CORE.md, AGENTS_TASK.md, etc.).
+5. For each entry in `context_files`: `SetAgentContextFile` UPSERT — overlays operator-provided content over seeds.
+6. Emit `agent.created` audit event.
+7. Return `agent_uuid`, `agent_id`, basic config + list of `context_files_written`.
+
+Delete flow:
+1. Resolve agent (tenant-scoped via store).
+2. Require `confirm=true` — otherwise return guard error explaining the 27+ cascade tables.
+3. `agentStore.Delete(ctx, id)` — hard DELETE with ON DELETE CASCADE.
+4. Emit `bus.EventCacheInvalidate` for `CacheKindAgent`.
+5. Emit `bus.TopicAgentDeleted` broadcast (matches WS handler; HTTP handler omits this currently, but the broadcast is needed for downstream orphan cleanup such as provider deregistration).
+6. Emit `agent.deleted` audit event.
+7. Return confirmation.
+
+Conflict-resolution rules:
+- `agentProvisionSlugRe` duplicates the slug regex from `internal/http/validate.go` for cross-package independence (same rule as `agent_config`).
+- `agentProvisionContextFileAllowlist` mirrors the allowlist used by `agent_context_files`; intentional duplication.
+- `agent_type` is forced to `predefined` — the tool refuses to create `open` agents (deprecated in upstream v3).
+- The summoner subsystem is intentionally NOT invoked; the operator provides context files directly. Operators who want a summoner-style first draft should call the HTTP `POST /v1/agents` endpoint with `agent_description`.
+- Workspace path defaults to `{agentCfg.Workspace}/{agent_key}` (matches HTTP `handleCreate`); falls back to `data/workspace/{agent_key}` if `SetDefaultWorkspace` was never called.
+- Delete emits `TopicAgentDeleted` even though HTTP `handleDelete` does not. If upstream eventually adds it to HTTP, the tool's behavior becomes redundant (not buggy).

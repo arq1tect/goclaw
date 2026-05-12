@@ -164,5 +164,16 @@ func wireExtraTools(
 	toolsReg.Register(agentConfigTool)
 	slog.Info("agent_config tool registered (agent store + msgBus wired)")
 
+	// agent_provision tool (fork): create / delete / list agents in the
+	// tenant. Needs agent store + msgBus (audit + cache invalidation +
+	// TopicAgentDeleted) + default workspace path from agentCfg for the
+	// auto-computed per-agent workspace on create.
+	agentProvisionTool := tools.NewAgentProvisionTool()
+	agentProvisionTool.SetAgentStore(pgStores.Agents)
+	agentProvisionTool.SetMessageBus(msgBus)
+	agentProvisionTool.SetDefaultWorkspace(agentCfg.Workspace)
+	toolsReg.Register(agentProvisionTool)
+	slog.Info("agent_provision tool registered (store + msgBus + workspace wired)")
+
 	return heartbeatTool, hasMemory
 }

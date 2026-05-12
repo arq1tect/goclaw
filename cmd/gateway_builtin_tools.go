@@ -52,6 +52,7 @@ func builtinToolSeedData() []store.BuiltinToolDef {
 		// admin tools (fork): cross-agent CRUD for forge-class operators. Off by default — grant via tools_config.allow.
 		{Name: "agent_context_files", DisplayName: "Agent Context Files", Description: "Cross-agent CRUD over agent-level context files (SOUL.md, IDENTITY.md, CAPABILITIES.md, USER_PREDEFINED.md, AGENTS.md, USER.md, BOOTSTRAP.md, HEARTBEAT.md, MEMORY.json). Tenant-scoped. Admin-class.", Category: "admin", Enabled: false},
 		{Name: "agent_config", DisplayName: "Agent Config", Description: "Read or patch-update configuration of any agent in the tenant: provider, model, thinking_level, reasoning_config, tools_config, memory/sandbox configs, self_evolve/skill_evolve, status, etc. Tenant-scoped. Admin-class.", Category: "admin", Enabled: false},
+		{Name: "agent_provision", DisplayName: "Agent Provision", Description: "Create, delete, or list agents in the tenant. Create is atomic: agent record + seed default context files + overlay operator-provided SOUL/IDENTITY/CAPABILITIES/USER_PREDEFINED in one call. Delete is hard with cascade (27+ tables) and requires confirm=true. Tenant-scoped. Admin-class.", Category: "admin", Enabled: false},
 		// media — user must configure provider chain via UI before use
 		{Name: "read_image", DisplayName: "Read Image", Description: "Analyze images using a vision-capable LLM provider", Category: "media", Enabled: false,
 			Requires: []string{"vision_provider"},
