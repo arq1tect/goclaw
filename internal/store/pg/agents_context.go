@@ -336,3 +336,26 @@ func (s *PGAgentStore) SetUserOverride(ctx context.Context, override *store.User
 	)
 	return err
 }
+
+// DeleteAgentContextFile removes a single agent-level context file. Returns
+// (true, nil) if a row was deleted, (false, nil) if no matching row existed
+// (idempotent), or (false, err) on store error. Tenant scoping is enforced
+// via scopeClause.
+func (s *PGAgentStore) DeleteAgentContextFile(ctx context.Context, agentID uuid.UUID, fileName string) (bool, error) {
+	tClause, tArgs, _, err := scopeClause(ctx, 3)
+	if err != nil {
+		return false, err
+	}
+	res, err := s.db.ExecContext(ctx,
+		"DELETE FROM agent_context_files WHERE agent_id = $1 AND file_name = $2"+tClause,
+		append([]any{agentID, fileName}, tArgs...)...,
+	)
+	if err != nil {
+		return false, err
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return false, err
+	}
+	return n > 0, nil
+}

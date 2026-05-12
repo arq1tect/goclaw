@@ -676,6 +676,9 @@ type AgentAccessStore interface {
 type AgentContextStore interface {
 	GetAgentContextFiles(ctx context.Context, agentID uuid.UUID) ([]AgentContextFileData, error)
 	SetAgentContextFile(ctx context.Context, agentID uuid.UUID, fileName, content string) error
+	// DeleteAgentContextFile removes a single agent-level context file. Returns (true, nil)
+	// if a row was deleted, (false, nil) if no row matched (idempotent), or (false, err).
+	DeleteAgentContextFile(ctx context.Context, agentID uuid.UUID, fileName string) (bool, error)
 	PropagateContextFile(ctx context.Context, agentID uuid.UUID, fileName string) (int, error)
 	GetUserContextFiles(ctx context.Context, agentID uuid.UUID, userID string) ([]UserContextFileData, error)
 	// ListUserContextFilesByName returns all per-user copies of fileName across all users of agentID.

@@ -31,6 +31,9 @@ func (s *stubAgentStore) SetAgentContextFile(_ context.Context, _ uuid.UUID, _, 
 	s.setAgentCallN.Add(1)
 	return nil
 }
+func (s *stubAgentStore) DeleteAgentContextFile(_ context.Context, _ uuid.UUID, _ string) (bool, error) {
+	return false, nil
+}
 func (s *stubAgentStore) GetUserContextFiles(_ context.Context, _ uuid.UUID, _ string) ([]store.UserContextFileData, error) {
 	return s.userFiles, nil
 }

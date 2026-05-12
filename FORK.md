@@ -272,3 +272,38 @@ The new descriptions explicitly:
 
 9. **All other conflicts** — keep BOTH sides. Merge logically. Prefer the version
    that compiles and passes tests.
+
+---
+
+## 5. Agent administration tools
+
+A new family of builtin tools that lets an admin-class agent (e.g. `forge`)
+provision and edit other agents on this goclaw instance without going through
+the dashboard UI or external HTTP API. Tools run in-process, access stores
+directly, and are tenant-scoped. Access is governed by `tools_config.allow`
+per-agent — they are off by default in `builtin_tools` and must be explicitly
+granted.
+
+### `agent_context_files` (first tool in this family)
+
+Cross-agent CRUD for agent-level context files (SOUL/IDENTITY/CAPABILITIES/
+USER_PREDEFINED/AGENTS/USER/BOOTSTRAP/HEARTBEAT/MEMORY.json). Actions:
+`list`, `read`, `write`, `delete`. Write returns the post-write state
+(re-read from DB) for true verification. Files load-bearing for the agent
+(SOUL, IDENTITY, CAPABILITIES, USER_PREDEFINED, AGENTS, HEARTBEAT) are
+protected from deletion.
+
+Files:
+- `internal/tools/agent_context_files.go` — tool implementation.
+- `internal/tools/agent_context_files_test.go` — unit tests.
+- `internal/store/agent_store.go` — added `DeleteAgentContextFile(ctx, agentID, fileName) (bool, error)` to `AgentContextStore` interface.
+- `internal/store/pg/agents_context.go` — PG implementation of Delete.
+- `internal/store/sqlitestore/agents_context.go` — SQLite implementation of Delete.
+- `internal/tools/context_file_interceptor_test.go` — added `DeleteAgentContextFile` stub method to `stubAgentStore` to satisfy the extended interface (no behavior change).
+- `cmd/gateway_tools_wiring.go` — registers the tool and wires the agent store.
+- `cmd/gateway_builtin_tools.go` — adds `agent_context_files` entry to the builtin tools registry (`Enabled: false` default, category `admin`).
+
+Conflict-resolution rules:
+- The `DeleteAgentContextFile` interface addition is upstream-additive — no existing methods modified. New implementations need not be backported if upstream picks up a different design.
+- The local `allowedContextFiles` list in `agent_context_files.go` intentionally duplicates (rather than imports) the allowlist used by `gateway/methods/agents_files.go` — keeps the tool free of cross-file coupling for merge stability. If upstream adds a new bootstrap file we want exposed, add it explicitly to the tool's list.
+- The `protectedFromDeletion` set is a tool-local guard. There is no system-wide delete protection on context files in upstream as of this writing; if upstream adds one, our tool guard becomes redundant and can be removed.

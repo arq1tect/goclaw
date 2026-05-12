@@ -147,5 +147,13 @@ func wireExtraTools(
 		}
 	}
 
+	// agent_context_files tool (fork): cross-agent CRUD over agent-level
+	// context files for admin-class agents like forge. Store is wired
+	// immediately at registration since pgStores is ready here.
+	agentCtxFilesTool := tools.NewAgentContextFilesTool()
+	agentCtxFilesTool.SetAgentStore(pgStores.Agents)
+	toolsReg.Register(agentCtxFilesTool)
+	slog.Info("agent_context_files tool registered (agent store wired)")
+
 	return heartbeatTool, hasMemory
 }

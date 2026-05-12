@@ -49,6 +49,8 @@ func builtinToolSeedData() []store.BuiltinToolDef {
 			Settings: json.RawMessage(`{"max_entities_per_run":10,"max_relations_per_run":20}`),
 			Requires: []string{"knowledge_graph"},
 		},
+		// admin tools (fork): cross-agent CRUD for forge-class operators. Off by default — grant via tools_config.allow.
+		{Name: "agent_context_files", DisplayName: "Agent Context Files", Description: "Cross-agent CRUD over agent-level context files (SOUL.md, IDENTITY.md, CAPABILITIES.md, USER_PREDEFINED.md, AGENTS.md, USER.md, BOOTSTRAP.md, HEARTBEAT.md, MEMORY.json). Tenant-scoped. Admin-class.", Category: "admin", Enabled: false},
 		// media — user must configure provider chain via UI before use
 		{Name: "read_image", DisplayName: "Read Image", Description: "Analyze images using a vision-capable LLM provider", Category: "media", Enabled: false,
 			Requires: []string{"vision_provider"},
