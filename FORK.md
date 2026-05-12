@@ -399,3 +399,24 @@ Conflict-resolution rules:
 - Skill ID resolution accepts UUID or slug. Slug path uses `ListSkills` linear scan — acceptable for low-frequency operator use. If upstream adds `GetSkillBySlug`, switch to it.
 - MCP server ID resolution accepts UUID or name via `GetServerByName`.
 - Skills wiring is conditional on `pgStores.Skills` implementing `store.SkillManageStore`. If skills are not present or only base `SkillStore` is available, skill sub-actions return "skill store not wired"; MCP sub-actions still work.
+
+### `agent_hooks` (agent administration family, fifth tool)
+
+Hook CRUD per agent and tenant scope. Mirrors the WS RPC `hooks.*`
+methods (`internal/gateway/methods/hooks.go`) end-to-end except for
+`hooks.test` (separate concern, not in this tool).
+
+Sub-actions: `list`, `get`, `create`, `update`, `delete`, `toggle`,
+`set_agents`.
+
+Files:
+- `internal/tools/agent_hooks.go` — tool implementation (~570 lines).
+- `internal/tools/agent_hooks_test.go` — unit tests (22 cases incl. dispatch, scope validation, agent_ids resolution by slug, mutable-field allowlist, toggle, set_agents).
+- `cmd/gateway_tools_wiring.go` — registers and wires the tool with `pgStores.Agents` and `pgStores.Hooks` (cast to `hooks.HookStore`); registration is conditional on the hook store being available.
+- `cmd/gateway_builtin_tools.go` — adds `agent_hooks` builtin entry (`Enabled: false`, category `admin`).
+
+Notable design choices:
+- **Global scope is blocked**: scope=global hooks require master-scope context per the WS handler. An admin agent does not have master-scope, so the tool refuses scope=global and instructs the operator that global hooks must be created out-of-band.
+- **Mutable-field allowlist on update**: `name`, `matcher`, `if_expr`, `timeout_ms`, `on_timeout`, `priority`, `enabled`, `config`, `handler_type`, `event`, `metadata`. Protected columns (`source`, `version`, `tenant_id`, `id`, `created_by`) are silently dropped with the list reported in `ignored_fields`. This matches the WS handler's anti-escalation guard ("source strip closes the C2 forge").
+- **Agent binding**: for scope=agent, `agent_ids` accepts a list of agent_key or UUID strings; the tool resolves all via `agent_store.GetByKey`/`GetByID`. `Create` populates the `hook_agents` junction atomically via the PG store's internal insert; `set_agents` uses `SetHookAgents` to replace the junction without touching other fields.
+- Wiring is conditional: if `pgStores.Hooks` does not implement `hooks.HookStore`, the tool is not registered (gateway logs the skip).

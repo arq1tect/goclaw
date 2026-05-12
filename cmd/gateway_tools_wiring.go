@@ -7,6 +7,7 @@ import (
 
 	"github.com/nextlevelbuilder/goclaw/internal/bus"
 	"github.com/nextlevelbuilder/goclaw/internal/config"
+	"github.com/nextlevelbuilder/goclaw/internal/hooks"
 	"github.com/nextlevelbuilder/goclaw/internal/store"
 	"github.com/nextlevelbuilder/goclaw/internal/tools"
 )
@@ -191,6 +192,19 @@ func wireExtraTools(
 	agentGrantsTool.SetMessageBus(msgBus)
 	toolsReg.Register(agentGrantsTool)
 	slog.Info("agent_grants tool registered (agent + skill + mcp stores wired)")
+
+	// agent_hooks tool (fork): hook CRUD per agent/tenant. Hooks store
+	// is type-erased (any) in stores.Stores to avoid import cycle; cast
+	// to hooks.HookStore.
+	if hs, ok := pgStores.Hooks.(hooks.HookStore); ok && hs != nil {
+		agentHooksTool := tools.NewAgentHooksTool()
+		agentHooksTool.SetAgentStore(pgStores.Agents)
+		agentHooksTool.SetHookStore(hs)
+		toolsReg.Register(agentHooksTool)
+		slog.Info("agent_hooks tool registered (agent + hook stores wired)")
+	} else {
+		slog.Info("agent_hooks tool not registered (hook store unavailable)")
+	}
 
 	return heartbeatTool, hasMemory
 }
