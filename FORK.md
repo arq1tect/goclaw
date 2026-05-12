@@ -420,3 +420,58 @@ Notable design choices:
 - **Mutable-field allowlist on update**: `name`, `matcher`, `if_expr`, `timeout_ms`, `on_timeout`, `priority`, `enabled`, `config`, `handler_type`, `event`, `metadata`. Protected columns (`source`, `version`, `tenant_id`, `id`, `created_by`) are silently dropped with the list reported in `ignored_fields`. This matches the WS handler's anti-escalation guard ("source strip closes the C2 forge").
 - **Agent binding**: for scope=agent, `agent_ids` accepts a list of agent_key or UUID strings; the tool resolves all via `agent_store.GetByKey`/`GetByID`. `Create` populates the `hook_agents` junction atomically via the PG store's internal insert; `set_agents` uses `SetHookAgents` to replace the junction without touching other fields.
 - Wiring is conditional: if `pgStores.Hooks` does not implement `hooks.HookStore`, the tool is not registered (gateway logs the skip).
+
+### `agent_telegram` (agent administration family, sixth and final tool)
+
+Telegram channel management via the Bot API 9.6 Managed Bots flow.
+Lets an admin agent spawn a child bot for each new agent it provisions:
+send a one-tap deep link to the operator via the parent bot, poll
+Telegram for the resulting child token, then register the child as a
+new channel bound to the target agent.
+
+Sub-actions: `list_channels`, `request_managed_bot`,
+`poll_managed_bot_token`, `unlink`.
+
+Files:
+- `internal/tools/agent_telegram.go` — tool implementation (~580 lines).
+- `internal/tools/agent_telegram_test.go` — unit tests (21 cases incl. dispatch, username validation, parent resolution by id/name/caller-agent, deep-link assembly, polling-pending vs ready, duplicate channel guard, unlink by id/name).
+- `cmd/gateway_tools_wiring.go` — registers the tool with `pgStores.Agents`, `pgStores.ChannelInstances`, and `msgBus`. Registration is conditional on the channel store being present.
+- `cmd/gateway_builtin_tools.go` — adds `agent_telegram` builtin entry (`Enabled: false`, category `admin`).
+
+Notable design choices:
+- **No channels-layer extension required.** The tool calls
+  `api.telegram.org/bot{token}/{method}` directly via a stdlib `net/http`
+  client. Parent bot token is read from `ChannelInstanceStore.Get` which
+  transparently decrypts via `GOCLAW_ENCRYPTION_KEY`. The new child token
+  is persisted through `ChannelInstanceStore.Create` (re-encrypted).
+- **Polling, not push.** Bot API 9.6 normally delivers a `ManagedBotUpdated`
+  webhook update when the operator confirms in their client. Handling that
+  push would require extending the Telegram channels-layer update parser
+  (a merge-conflict-prone fork edit). Instead, the tool exposes
+  `poll_managed_bot_token` which calls Telegram's `getManagedBotToken` —
+  pending state surfaces as a non-error `{ready:false,status:"pending"}`
+  response, success creates the channel. Forge decides retry cadence.
+  If push becomes necessary later, add a channels-layer extension and
+  let it emit an event that forge listens to; the tool can adopt that
+  path without breaking the polling API.
+- **Parent resolution order**: `parent_channel_id` → `parent_channel_name`
+  → any Telegram channel attached to the caller agent (from
+  `store.AgentIDFromContext`). The caller-agent default makes the common
+  case (forge spawns child bots) ergonomic.
+- **Username validation**: Telegram bot username rules enforced locally
+  (5-32 chars, `[A-Za-z0-9_]`, must end with "bot"). Caller failures
+  surface early before any Telegram round trip.
+- **HTTP client**: 10-second per-call timeout, JSON-only, response body
+  capped at 1 MB. Override via `SetHTTPClient` and `SetAPIBase` (used by
+  tests pointing at `httptest.Server`).
+
+Conflict-resolution rules:
+- `telegramCreds` shape in `internal/channels/telegram/factory.go` is the
+  canonical credential JSON for channel instances. The tool encodes new
+  child credentials in the same shape `{"token": "..."}`. If upstream
+  extends the credential shape (proxy, api_server), update the
+  `poll_managed_bot_token` channel-creation path accordingly.
+- Telegram API method names (`getMe`, `sendMessage`, `getManagedBotToken`)
+  are stable across the Bot API. If Telegram renames or repositions
+  managed-bot methods, update `tgGetBotUsername` / `handleRequestManagedBot`
+  / `handlePollManagedBotToken` correspondingly.

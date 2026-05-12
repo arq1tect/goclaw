@@ -206,5 +206,20 @@ func wireExtraTools(
 		slog.Info("agent_hooks tool not registered (hook store unavailable)")
 	}
 
+	// agent_telegram tool (fork): Telegram channel management via the
+	// Bot API 9.6 Managed Bots flow. Wires channel store + agent store
+	// + msgBus. Tool calls api.telegram.org directly (no channels-layer
+	// extension needed for outbound).
+	if pgStores.ChannelInstances != nil {
+		agentTelegramTool := tools.NewAgentTelegramTool()
+		agentTelegramTool.SetAgentStore(pgStores.Agents)
+		agentTelegramTool.SetChannelStore(pgStores.ChannelInstances)
+		agentTelegramTool.SetMessageBus(msgBus)
+		toolsReg.Register(agentTelegramTool)
+		slog.Info("agent_telegram tool registered (channel + agent stores wired)")
+	} else {
+		slog.Info("agent_telegram tool not registered (channel store unavailable)")
+	}
+
 	return heartbeatTool, hasMemory
 }
