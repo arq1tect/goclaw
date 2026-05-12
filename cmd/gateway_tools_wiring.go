@@ -175,5 +175,22 @@ func wireExtraTools(
 	toolsReg.Register(agentProvisionTool)
 	slog.Info("agent_provision tool registered (store + msgBus + workspace wired)")
 
+	// agent_grants tool (fork): skill + MCP-server grants per agent.
+	// Skills wired only if the SkillStore implementation also satisfies
+	// SkillManageStore (production PG impl does); MCP wired unconditionally.
+	agentGrantsTool := tools.NewAgentGrantsTool()
+	agentGrantsTool.SetAgentStore(pgStores.Agents)
+	if pgStores.Skills != nil {
+		if manageStore, ok := pgStores.Skills.(store.SkillManageStore); ok {
+			agentGrantsTool.SetSkillStore(manageStore)
+		}
+	}
+	if pgStores.MCP != nil {
+		agentGrantsTool.SetMCPStore(pgStores.MCP)
+	}
+	agentGrantsTool.SetMessageBus(msgBus)
+	toolsReg.Register(agentGrantsTool)
+	slog.Info("agent_grants tool registered (agent + skill + mcp stores wired)")
+
 	return heartbeatTool, hasMemory
 }

@@ -374,3 +374,28 @@ Conflict-resolution rules:
 - The summoner subsystem is intentionally NOT invoked; the operator provides context files directly. Operators who want a summoner-style first draft should call the HTTP `POST /v1/agents` endpoint with `agent_description`.
 - Workspace path defaults to `{agentCfg.Workspace}/{agent_key}` (matches HTTP `handleCreate`); falls back to `data/workspace/{agent_key}` if `SetDefaultWorkspace` was never called.
 - Delete emits `TopicAgentDeleted` even though HTTP `handleDelete` does not. If upstream eventually adds it to HTTP, the tool's behavior becomes redundant (not buggy).
+
+### `agent_grants` (agent administration family, fourth tool)
+
+Skill and MCP-server grants per agent. Mirrors HTTP
+`POST/DELETE /v1/skills/{id}/grants/agent` and
+`POST/DELETE /v1/mcp/servers/{id}/grants/agent`, plus list/enumerate helpers.
+
+Sub-actions: `list`, `grant_skill`, `revoke_skill`, `grant_mcp`,
+`revoke_mcp`, `list_skills_available`, `list_mcp_available`.
+
+Files:
+- `internal/tools/agent_grants.go` — tool implementation (~470 lines).
+- `internal/tools/agent_grants_test.go` — unit tests (22 cases incl. dispatch, ID resolution by UUID and slug/name, store errors, tool_allow/deny payloads, combined grant→list flow).
+- `cmd/gateway_tools_wiring.go` — registers and wires the tool with `pgStores.Agents`, `pgStores.Skills` (cast to `SkillManageStore`), `pgStores.MCP`, and `msgBus`.
+- `cmd/gateway_builtin_tools.go` — adds `agent_grants` builtin entry (`Enabled: false`, category `admin`).
+
+Side effects replicated from HTTP handlers:
+- Skill grant/revoke: `skillStore.BumpVersion()` + `bus.EventCacheInvalidate` (`CacheKindSkillGrants`) + audit `skill.grant_changed`.
+- MCP grant/revoke: `bus.EventCacheInvalidate` (`CacheKindMCP`) + audit `mcp_server.agent_granted` / `agent_revoked`.
+
+Conflict-resolution rules:
+- The tool defines two **minimal local interfaces** (`agentGrantsSkillStore`, `agentGrantsMCPStore`) inside the tool file rather than depending on the full `store.SkillManageStore` / `store.MCPServerStore` interfaces. Production wiring passes the full stores (they satisfy the minimal interfaces); tests stub only the methods we use. This isolates the tool from upstream interface drift.
+- Skill ID resolution accepts UUID or slug. Slug path uses `ListSkills` linear scan — acceptable for low-frequency operator use. If upstream adds `GetSkillBySlug`, switch to it.
+- MCP server ID resolution accepts UUID or name via `GetServerByName`.
+- Skills wiring is conditional on `pgStores.Skills` implementing `store.SkillManageStore`. If skills are not present or only base `SkillStore` is available, skill sub-actions return "skill store not wired"; MCP sub-actions still work.
