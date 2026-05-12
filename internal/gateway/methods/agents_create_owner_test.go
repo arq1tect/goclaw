@@ -74,6 +74,9 @@ func (s *createCaptureStore) GetAgentContextFiles(_ context.Context, _ uuid.UUID
 func (s *createCaptureStore) SetAgentContextFile(_ context.Context, _ uuid.UUID, _, _ string) error {
 	return nil
 }
+func (s *createCaptureStore) DeleteAgentContextFile(_ context.Context, _ uuid.UUID, _ string) (bool, error) {
+	return false, nil
+}
 func (s *createCaptureStore) GetUserContextFiles(_ context.Context, _ uuid.UUID, _ string) ([]store.UserContextFileData, error) {
 	return nil, nil
 }

@@ -41,6 +41,9 @@ func (s *seedStubStore) SetAgentContextFile(_ context.Context, _ uuid.UUID, name
 	s.agentFiles[name] = content
 	return nil
 }
+func (s *seedStubStore) DeleteAgentContextFile(_ context.Context, _ uuid.UUID, _ string) (bool, error) {
+	return false, nil
+}
 func (s *seedStubStore) GetUserContextFiles(_ context.Context, _ uuid.UUID, _ string) ([]store.UserContextFileData, error) {
 	var out []store.UserContextFileData
 	for name, content := range s.userFiles {
