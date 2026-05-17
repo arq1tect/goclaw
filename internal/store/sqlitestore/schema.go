@@ -887,6 +887,15 @@ func EnsureSchema(db *sql.DB) error {
 			if !ok {
 				return fmt.Errorf("sqlite: missing migration for version %d → %d", v, v+1)
 			}
+			if tableName, columnName, ok := idempotentColumnMigration(v); ok {
+				hasColumn, err := sqliteColumnExists(db, tableName, columnName)
+				if err != nil {
+					return fmt.Errorf("inspect %s.%s: %w", tableName, columnName, err)
+				}
+				if hasColumn {
+					patch = `SELECT 1;`
+				}
+			}
 			// Migrations that rebuild a table referenced by another table's FK
 			// require foreign_keys=OFF per SQLite altertable §7. The pragma is
 			// a no-op inside a transaction, so toggle it around BEGIN/COMMIT.
@@ -951,6 +960,44 @@ func EnsureSchema(db *sql.DB) error {
 	}
 
 	return seedMasterTenant(db)
+}
+
+func idempotentColumnMigration(version int) (string, string, bool) {
+	switch version {
+	case 26:
+		return "secure_cli_agent_grants", "encrypted_env", true
+	case 28:
+		return "webhook_calls", "lease_token", true
+	case 29:
+		return "webhooks", "encrypted_secret", true
+	case 33:
+		return "agents", "model_fallback", true
+	default:
+		return "", "", false
+	}
+}
+
+func sqliteColumnExists(db *sql.DB, tableName, columnName string) (bool, error) {
+	rows, err := db.Query("PRAGMA table_info(" + tableName + ")")
+	if err != nil {
+		return false, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var cid int
+		var name, colType string
+		var notNull int
+		var defaultValue any
+		var pk int
+		if err := rows.Scan(&cid, &name, &colType, &notNull, &defaultValue, &pk); err != nil {
+			return false, err
+		}
+		if name == columnName {
+			return true, nil
+		}
+	}
+	return false, rows.Err()
 }
 
 // seedMasterTenant ensures the master tenant row exists (idempotent).
