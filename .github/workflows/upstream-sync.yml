@@ -36,20 +36,20 @@ jobs:
         run: |
           git remote add upstream https://github.com/nextlevelbuilder/goclaw.git || true
           git fetch upstream
-          git fetch origin dev || true
+          git fetch origin main || true
 
-      - name: Update dev branch (mirror of upstream/dev)
+      - name: Update main branch (mirror of upstream/main)
         run: |
-          git checkout -B dev upstream/dev
-          git merge --ff-only upstream/dev
+          git checkout -B main upstream/main
+          git merge --ff-only upstream/main
           git remote set-url origin https://x-access-token:${{ secrets.GH_PAT }}@github.com/${{ github.repository }}.git
-          git push origin dev
+          git push origin main
 
-      - name: Merge dev into custom
+      - name: Merge main into custom
         id: merge
         run: |
           git checkout custom
-          if git merge origin/dev --no-edit; then
+          if git merge origin/main --no-edit; then
             echo "status=clean" >> $GITHUB_OUTPUT
           else
             echo "status=conflict" >> $GITHUB_OUTPUT
@@ -83,14 +83,14 @@ jobs:
           if [ -z "$CONFLICTED" ]; then
             echo "All conflicts resolved by git merge strategies"
             git add -A
-            git commit -m "upstream-sync: merge origin/dev (auto-resolved via .gitattributes)"
+            git commit -m "upstream-sync: merge origin/main (auto-resolved via .gitattributes)"
           else
             echo "Conflicts requiring Claude resolution:"
             echo "$CONFLICTED"
 
             FORK_DOC=$(cat FORK.md)
 
-            claude -p "You are resolving merge conflicts between origin/dev (mirror of upstream/dev) and our forks custom branch.
+            claude -p "You are resolving merge conflicts between origin/main (mirror of upstream/main) and our forks custom branch.
 
           The fork architecture is described in FORK.md (see content below). PRESERVE everything listed there. For every conflicted file: read it, understand both sides, resolve intelligently per the rules in FORK.md, then git add the file. Do not touch unrelated files.
 
@@ -107,7 +107,7 @@ jobs:
               exit 1
             else
               git add -A
-              git commit -m "upstream-sync: merge origin/dev with conflict resolution"
+              git commit -m "upstream-sync: merge origin/main with conflict resolution"
             fi
           fi
 

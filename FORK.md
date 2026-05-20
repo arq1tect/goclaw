@@ -8,12 +8,14 @@ context here directly degrades automated conflict resolution.
 ## Branch Model
 
 - `custom` — production branch (default). All fork-specific commits land here.
-- `dev` — fast-forward mirror of `upstream/dev`. Maintained by CI; never commit directly.
-- No `main` branch. `upstream/main` is referenced directly when needed.
+- `main` — fast-forward mirror of `upstream/main`. Maintained by CI; never commit directly.
+- `dev` — frozen at `upstream/dev` HEAD as of 2026-05-04 (last upstream/dev commit). Kept
+  for historical reference only; upstream moved active trunk to `main` and `dev` is no
+  longer maintained upstream. Do not sync, do not merge into `custom`.
 
 CI hourly:
-1. FF-merge `upstream/dev` -> `origin/dev`.
-2. Merge `origin/dev` -> `custom`. If conflicts, Claude resolves using this file as guide.
+1. FF-merge `upstream/main` -> `origin/main`.
+2. Merge `origin/main` -> `custom`. If conflicts, Claude resolves using this file as guide.
 3. On any change to `custom`, trigger `deploy.yml` -> redeploy to goclaw-ath server.
 
 ## Fork-Specific Components (PRESERVE on every merge)
