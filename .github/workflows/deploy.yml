@@ -52,13 +52,16 @@ jobs:
           ssh-keyscan -H 100.66.2.18 >> ~/.ssh/known_hosts 2>/dev/null || true
 
       - name: Deploy to server
+        env:
+          INFISICAL_CLIENT_ID: ${{ secrets.INFISICAL_CLIENT_ID }}
+          INFISICAL_CLIENT_SECRET: ${{ secrets.INFISICAL_SECRET }}
         run: |
-          ssh -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key wn@100.66.2.18 'bash -s' << 'DEPLOY'
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key wn@100.66.2.18 "bash -s" <<DEPLOY
           set -e
           cd ~/goclaw
-          export PATH=$PATH:/snap/bin
+          export PATH=\$PATH:/snap/bin
 
-          PREV_COMMIT=$(git rev-parse HEAD)
+          PREV_COMMIT=\$(git rev-parse HEAD)
 
           git fetch origin custom
           git checkout custom
@@ -67,17 +70,40 @@ jobs:
           go build -o goclaw .
           cd ui/web && pnpm install && pnpm build && cd ../..
 
+          # Critical zone: from this point, the service must be brought back up
+          # even if a step fails. EXIT trap is the safety net.
+          set +e
+          trap 'sudo systemctl start goclaw 2>/dev/null || true' EXIT
+
           sudo systemctl stop goclaw
-          infisical run --projectId=4356f051-f674-41b7-b357-aea58ea96881 --env=dev --domain=https://eu.infisical.com --command "./goclaw migrate up" || true
+
+          INFISICAL_TOKEN=\$(infisical login --method=universal-auth \\
+            --client-id="$INFISICAL_CLIENT_ID" \\
+            --client-secret="$INFISICAL_CLIENT_SECRET" \\
+            --domain=https://eu.infisical.com --plain 2>/dev/null)
+          if [ -n "\$INFISICAL_TOKEN" ]; then
+            if infisical run --token="\$INFISICAL_TOKEN" \\
+                --projectId=4356f051-f674-41b7-b357-aea58ea96881 --env=dev \\
+                --domain=https://eu.infisical.com --command "./goclaw migrate up"; then
+              echo "MIGRATE OK"
+            else
+              echo "MIGRATE FAILED (continuing - service start is still required)"
+            fi
+          else
+            echo "INFISICAL LOGIN FAILED (skipping migrate - service start still required)"
+          fi
+
           sudo systemctl daemon-reload
           sudo systemctl start goclaw
+          trap - EXIT
+          set -e
 
           sleep 5
           if curl -sf http://localhost:18790/health > /dev/null; then
             echo "DEPLOY OK"
           else
             echo "DEPLOY FAILED - rolling back"
-            git checkout $PREV_COMMIT
+            git checkout \$PREV_COMMIT
             go build -o goclaw .
             sudo systemctl restart goclaw
             exit 1
