@@ -475,3 +475,71 @@ Conflict-resolution rules:
   are stable across the Bot API. If Telegram renames or repositions
   managed-bot methods, update `tgGetBotUsername` / `handleRequestManagedBot`
   / `handlePollManagedBotToken` correspondingly.
+
+### MCP bridge admin opt-in (cross-cutting)
+
+The six admin tools above plus `publish_skill`, `skill_manage`, and
+`knowledge_graph_mutate` are exposed to the Claude CLI provider through the
+MCP bridge (`internal/mcp/bridge_server.go`). Upstream's bridge advertises a
+**single static whitelist** to every agent regardless of `tools_config.allow`,
+which means admin tools would either reach all agents or none.
+
+This fork splits the bridge surface into two sets and filters per-agent:
+
+- **`BridgeToolNamesPublic`** — general-purpose tools (filesystem, web,
+  memory read, messaging, sessions, browser, etc.). Exposed to every agent.
+- **`BridgeToolNamesAdminOptIn`** — admin / cross-agent / catalog-mutating
+  tools. Exposed to an agent only when its `tools_config.allow` explicitly
+  contains the tool name.
+
+Filtering happens in two places using mcp-go middleware:
+
+1. `WithToolFilter` at `tools/list` — hides admin tools the agent hasn't
+   opted into so they don't appear in the model's deferred-tool list.
+2. `WithToolHandlerMiddleware` at `tools/call` — denies invocation of an
+   admin tool not in the agent's allow-list (defense-in-depth against cached
+   tool lists or fabricated calls).
+
+Both paths resolve the agent via `store.AgentIDFromContext(ctx)`, which is
+populated by `bridgeContextMiddleware` from the HMAC-signed `X-Agent-ID`
+header. When agent context is missing or lookup fails, the bridge falls back
+to **public-only** — admin tools never leak.
+
+Why this design (over alternatives considered):
+
+- Per-session `mcp-config.json` `allowedTools` (claude-cli side) would push
+  the policy onto a separate file the bridge doesn't validate — easier to
+  drift, no defense-in-depth at the call site.
+- Two separate bridge endpoints (one public, one admin-gated by URL) would
+  double the HMAC plumbing and split the registry; the middleware approach
+  keeps a single endpoint and reuses the existing context.
+
+Files:
+- `internal/mcp/bridge_server.go` — two tool sets, `BridgeAgentLookup`
+  interface (minimal subset of `store.AgentStore` for testability),
+  `agentAllowedBridgeTools` resolver, `WithToolFilter` + middleware setup.
+- `internal/mcp/bridge_admin_filter_test.go` — 9 unit tests covering nil
+  lookup, missing agent in context, lookup error, missing tools_config,
+  empty allow, admin subset, full admin allow, unknown-name handling, and
+  set non-overlap.
+- `internal/gateway/server.go` — passes `s.agentStore` as the fourth
+  argument to `NewBridgeServer`.
+
+Operational note: to grant a new agent an admin tool, add its name to
+`agents.tools_config.allow` (via dashboard or `agent_config.update`). There
+is no global toggle to revoke — opt-in is per-agent by design.
+
+Conflict-resolution rules:
+
+- The Public set is intentionally close to upstream's `BridgeToolNames`.
+  When upstream adds a new general-purpose tool to its bridge, add it to
+  `BridgeToolNamesPublic`. When upstream changes the variable name, update
+  the alias but keep the two-set structure.
+- The AdminOptIn set is fork-only. Adding new admin-class tools (future
+  `agent_X`) goes into this set, not Public.
+- `BridgeAgentLookup` deliberately narrows `store.AgentStore` to one method.
+  If upstream extends `AgentStore` with breaking changes, the bridge is
+  insulated.
+- `WithToolFilter` and `WithToolHandlerMiddleware` are mcp-go v0.44 APIs. If
+  upstream's mcp-go bump removes or renames them, update both call sites
+  together — they are paired (filter for discovery, middleware for calls).

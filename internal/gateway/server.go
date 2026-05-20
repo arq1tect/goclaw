@@ -183,7 +183,7 @@ func (s *Server) BuildMux() *http.ServeMux {
 	// prevent unauthenticated tool invocations if port is exposed.
 	if s.tools != nil {
 		if s.cfg.Gateway.Token != "" {
-			bridgeHandler := mcpbridge.NewBridgeServer(s.tools, "1.0.0", s.msgBus)
+			bridgeHandler := mcpbridge.NewBridgeServer(s.tools, "1.0.0", s.msgBus, s.agentStore)
 			handler := tokenAuthMiddleware(s.cfg.Gateway.Token,
 				bridgeContextMiddleware(s.cfg.Gateway.Token, s.agentStore, bridgeHandler))
 			mux.Handle("/mcp/bridge", handler)

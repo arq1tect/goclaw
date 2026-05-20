@@ -8,16 +8,22 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/google/uuid"
 	mcpgo "github.com/mark3labs/mcp-go/mcp"
 	mcpserver "github.com/mark3labs/mcp-go/server"
 
 	"github.com/nextlevelbuilder/goclaw/internal/bus"
+	"github.com/nextlevelbuilder/goclaw/internal/store"
 	"github.com/nextlevelbuilder/goclaw/internal/tools"
 )
 
-// BridgeToolNames is the subset of GoClaw tools exposed via the MCP bridge.
-// Excluded: spawn (agent loop), create_forum_topic (channels).
-var BridgeToolNames = map[string]bool{
+// BridgeToolNamesPublic is the set of GoClaw tools exposed to every agent via
+// the MCP bridge regardless of tools_config.allow. General-purpose actions
+// without cross-agent or destructive scope.
+//
+// Excluded from the bridge entirely: spawn (agent loop) and create_forum_topic
+// (channels owned by the agent loop, not the CLI).
+var BridgeToolNamesPublic = map[string]bool{
 	// Filesystem
 	"read_file":  true,
 	"write_file": true,
@@ -27,10 +33,11 @@ var BridgeToolNames = map[string]bool{
 	// Web
 	"web_search": true,
 	"web_fetch":  true,
-	// Memory & knowledge
-	"memory_search": true,
-	"memory_get":    true,
-	"skill_search":  true,
+	// Memory & knowledge (read-only)
+	"memory_search":          true,
+	"memory_get":             true,
+	"skill_search":           true,
+	"knowledge_graph_search": true,
 	// Media
 	"read_image":   true,
 	"read_audio":   true,
@@ -52,31 +59,143 @@ var BridgeToolNames = map[string]bool{
 	"team_tasks": true,
 }
 
-// NewBridgeServer creates a StreamableHTTPServer that exposes GoClaw tools as MCP tools.
-// It reads tools from the registry, filters to BridgeToolNames, and serves them
-// over streamable-http transport (stateless mode).
-// msgBus is optional; when non-nil, tools that produce media (deliver:true) will
-// publish file attachments directly to the outbound bus.
-func NewBridgeServer(reg *tools.Registry, version string, msgBus *bus.MessageBus) *mcpserver.StreamableHTTPServer {
-	srv := mcpserver.NewMCPServer("goclaw-bridge", version,
-		mcpserver.WithToolCapabilities(false),
-	)
+// BridgeToolNamesAdminOptIn is the set of cross-agent or catalog-mutating tools
+// that are NOT exposed by default. An agent gets them only when its
+// tools_config.allow explicitly contains the tool name.
+//
+// This is the opt-in surface for admin-class agents like forge. New agents
+// receive none of these unless an operator (or forge itself) grants them.
+var BridgeToolNamesAdminOptIn = map[string]bool{
+	// Cross-agent admin (fork: agent_* tools)
+	"agent_context_files": true,
+	"agent_config":        true,
+	"agent_provision":     true,
+	"agent_grants":        true,
+	"agent_hooks":         true,
+	"agent_telegram":      true,
+	// Skill catalog mutations
+	"publish_skill": true,
+	"skill_manage":  true,
+	// Knowledge graph mutation (read counterpart is public)
+	"knowledge_graph_mutate": true,
+}
 
-	// Register each safe tool from the GoClaw registry
-	var registered int
-	for name := range BridgeToolNames {
-		t, ok := reg.Get(name)
-		if !ok {
-			continue
+// BridgeAgentLookup is the minimal AgentStore subset the bridge needs.
+// Declared locally so tests can stub it without implementing the full
+// store.AgentStore interface (~30 methods). Any store.AgentStore satisfies
+// this implicitly.
+type BridgeAgentLookup interface {
+	GetByIDUnscoped(ctx context.Context, id uuid.UUID) (*store.AgentData, error)
+}
+
+// agentAllowedBridgeTools returns the set of tool names the agent in ctx may
+// invoke via the bridge. Always includes the public set; admin opt-in tools
+// are added only when present in the agent's tools_config.allow.
+//
+// Fail-safe: if lookup is nil, agent ID is absent, lookup fails, or the
+// agent has no allow-list, only public tools are returned. Admin tools never
+// leak to an agent that hasn't been explicitly granted them.
+func agentAllowedBridgeTools(ctx context.Context, lookup BridgeAgentLookup) map[string]bool {
+	allowed := make(map[string]bool, len(BridgeToolNamesPublic))
+	for n := range BridgeToolNamesPublic {
+		allowed[n] = true
+	}
+	if lookup == nil {
+		return allowed
+	}
+	id := store.AgentIDFromContext(ctx)
+	if id == uuid.Nil {
+		return allowed
+	}
+	ag, err := lookup.GetByIDUnscoped(ctx, id)
+	if err != nil || ag == nil {
+		return allowed
+	}
+	policy := ag.ParseToolsConfig()
+	if policy == nil || len(policy.Allow) == 0 {
+		return allowed
+	}
+	for _, name := range policy.Allow {
+		if BridgeToolNamesAdminOptIn[name] {
+			allowed[name] = true
 		}
+	}
+	return allowed
+}
 
-		mcpTool := convertToMCPTool(t)
-		handler := makeToolHandler(reg, name, msgBus)
-		srv.AddTool(mcpTool, handler)
-		registered++
+// NewBridgeServer creates a StreamableHTTPServer that exposes GoClaw tools as
+// MCP tools. Tools are registered from two sets:
+//   - BridgeToolNamesPublic: available to every agent
+//   - BridgeToolNamesAdminOptIn: available only when the agent's
+//     tools_config.allow explicitly lists the tool
+//
+// Per-request filtering uses the agent UUID injected into context by the
+// bridgeContextMiddleware (X-Agent-ID header, HMAC-protected).
+//
+// msgBus is optional; when non-nil, tools that produce media (deliver:true)
+// will publish file attachments directly to the outbound bus.
+//
+// agentLookup is optional; when nil, only public tools are ever exposed.
+func NewBridgeServer(reg *tools.Registry, version string, msgBus *bus.MessageBus, agentLookup BridgeAgentLookup) *mcpserver.StreamableHTTPServer {
+	// Filter applied at tools/list. Hides admin tools from agents that haven't
+	// opted into them via tools_config.allow.
+	filter := func(ctx context.Context, ts []mcpgo.Tool) []mcpgo.Tool {
+		allowed := agentAllowedBridgeTools(ctx, agentLookup)
+		out := make([]mcpgo.Tool, 0, len(ts))
+		for _, t := range ts {
+			if allowed[t.Name] {
+				out = append(out, t)
+			}
+		}
+		return out
 	}
 
-	slog.Info("mcp.bridge: tools registered", "count", registered)
+	// Defense-in-depth at tools/call: even if a client cached an old tools/list
+	// or fabricates a name, deny admin tools that aren't in the agent's allow.
+	authMW := func(next mcpserver.ToolHandlerFunc) mcpserver.ToolHandlerFunc {
+		return func(ctx context.Context, req mcpgo.CallToolRequest) (*mcpgo.CallToolResult, error) {
+			name := req.Params.Name
+			if BridgeToolNamesPublic[name] {
+				return next(ctx, req)
+			}
+			if BridgeToolNamesAdminOptIn[name] {
+				allowed := agentAllowedBridgeTools(ctx, agentLookup)
+				if !allowed[name] {
+					slog.Warn("mcp.bridge: admin tool denied (not in agent allow-list)",
+						"tool", name,
+						"agent_id", store.AgentIDFromContext(ctx))
+					return mcpgo.NewToolResultError("tool not allowed for this agent"), nil
+				}
+			}
+			return next(ctx, req)
+		}
+	}
+
+	srv := mcpserver.NewMCPServer("goclaw-bridge", version,
+		mcpserver.WithToolCapabilities(false),
+		mcpserver.WithToolFilter(filter),
+		mcpserver.WithToolHandlerMiddleware(authMW),
+	)
+
+	register := func(set map[string]bool) int {
+		var n int
+		for name := range set {
+			t, ok := reg.Get(name)
+			if !ok {
+				continue
+			}
+			srv.AddTool(convertToMCPTool(t), makeToolHandler(reg, name, msgBus))
+			n++
+		}
+		return n
+	}
+	publicCount := register(BridgeToolNamesPublic)
+	adminCount := register(BridgeToolNamesAdminOptIn)
+
+	slog.Info("mcp.bridge: tools registered",
+		"count", publicCount+adminCount,
+		"public", publicCount,
+		"admin_opt_in", adminCount)
 
 	return mcpserver.NewStreamableHTTPServer(srv,
 		mcpserver.WithStateLess(true),
