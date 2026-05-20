@@ -219,6 +219,18 @@ type ProvidersConfig struct {
 	BytePlus       ProviderConfig  `json:"byteplus"`        // BytePlus ModelArk (Seed 2.0)
 	BytePlusCoding ProviderConfig  `json:"byteplus_coding"` // BytePlus ModelArk Coding Plan
 	Kimi           ProviderConfig  `json:"kimi"`            // Kimi Code API (Moonshot Allegretto)
+	Vertex         VertexConfig    `json:"vertex"`          // Google Cloud Vertex AI (OAuth2 service account + ADC)
+}
+
+// VertexConfig configures Google Cloud Vertex AI.
+// Credentials precedence: APIKey (inline JSON) > CredentialsFile (path) > ADC (both empty).
+// ProjectID and Region are required; Model optional (defaults to google/gemini-2.0-flash-001).
+type VertexConfig struct {
+	APIKey          string `json:"api_key,omitempty"`          // service account JSON inline (secret — never persist in config.json)
+	CredentialsFile string `json:"credentials_file,omitempty"` // path to service account JSON file
+	ProjectID       string `json:"project_id,omitempty"`
+	Region          string `json:"region,omitempty"`
+	Model           string `json:"model,omitempty"`
 }
 
 // OllamaConfig configures a local (or self-hosted) Ollama instance.
@@ -295,6 +307,9 @@ func (p *ProvidersConfig) APIBaseForType(providerType string) string {
 		return p.BytePlusCoding.APIBase
 	case "kimi":
 		return p.Kimi.APIBase
+	case "vertex":
+		// Computed from project+region at registration time; no config-level static base.
+		return ""
 	default:
 		return ""
 	}
@@ -325,7 +340,8 @@ func (c *Config) HasAnyProvider() bool {
 		p.Novita.APIKey != "" ||
 		p.BytePlus.APIKey != "" ||
 		p.BytePlusCoding.APIKey != "" ||
-		p.Kimi.APIKey != ""
+		p.Kimi.APIKey != "" ||
+		(p.Vertex.ProjectID != "" && p.Vertex.Region != "")
 }
 
 // QuotaWindow defines request limits per time window. Zero means unlimited.
@@ -432,9 +448,15 @@ type ToolPolicySpec struct {
 	Deny       []string                   `json:"deny,omitempty"`
 	AlsoAllow  []string                   `json:"alsoAllow,omitempty"`
 	ByProvider map[string]*ToolPolicySpec `json:"byProvider,omitempty"`
+	Wait       *WaitToolPolicy            `json:"wait,omitempty"`
 	ToolCallPrefix string `json:"toolCallPrefix,omitempty"` // prefix to strip from model's tool call names before registry lookup
 }
 
+// WaitToolPolicy configures per-agent safety bounds for the wait tool.
+type WaitToolPolicy struct {
+	MinMs int `json:"min_ms,omitempty"`
+	MaxMs int `json:"max_ms,omitempty"`
+}
 
 // SessionsConfig controls session behavior.
 // Matching TS src/config/sessions/types.ts + src/config/types.base.ts.
