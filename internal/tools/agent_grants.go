@@ -19,7 +19,7 @@ import (
 type agentGrantsSkillStore interface {
 	ListSkills(ctx context.Context) []store.SkillInfo
 	GetSkillByID(ctx context.Context, id uuid.UUID) (store.SkillInfo, bool)
-	GrantToAgent(ctx context.Context, skillID, agentID uuid.UUID, version int, grantedBy string) error
+	GrantToAgent(ctx context.Context, skillID, agentID uuid.UUID, version int, grantedBy string, canManage ...bool) error
 	RevokeFromAgent(ctx context.Context, skillID, agentID uuid.UUID) error
 	ListWithGrantStatus(ctx context.Context, agentID uuid.UUID) ([]store.SkillWithGrantStatus, error)
 	BumpVersion()

@@ -109,7 +109,7 @@ func (f *fakeSkillStore) GetSkillByID(_ context.Context, id uuid.UUID) (store.Sk
 	return store.SkillInfo{}, false
 }
 
-func (f *fakeSkillStore) GrantToAgent(_ context.Context, skillID, agentID uuid.UUID, version int, _ string) error {
+func (f *fakeSkillStore) GrantToAgent(_ context.Context, skillID, agentID uuid.UUID, version int, _ string, _ ...bool) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	if f.grantErr != nil {
