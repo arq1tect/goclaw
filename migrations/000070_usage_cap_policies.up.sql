@@ -5,7 +5,7 @@ CREATE TABLE IF NOT EXISTS usage_cap_policies (
     provider_id UUID REFERENCES llm_providers(id) ON DELETE CASCADE,
     provider_type TEXT,
     model_id TEXT,
-    window TEXT NOT NULL CHECK (window IN ('hour', 'day', 'week', 'month')),
+    window_key TEXT NOT NULL CHECK (window_key IN ('hour', 'day', 'week', 'month')),
     max_tokens BIGINT CHECK (max_tokens IS NULL OR max_tokens >= 0),
     max_cost_micros BIGINT CHECK (max_cost_micros IS NULL OR max_cost_micros >= 0),
     enabled BOOLEAN NOT NULL DEFAULT true,

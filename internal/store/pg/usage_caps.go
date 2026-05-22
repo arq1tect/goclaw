@@ -22,7 +22,7 @@ func (s *PGUsageCapStore) CreateUsageCapPolicy(ctx context.Context, p *store.Usa
 	}
 	const q = `
 INSERT INTO usage_cap_policies (
-	id, tenant_id, agent_id, provider_id, provider_type, model_id, window,
+	id, tenant_id, agent_id, provider_id, provider_type, model_id, window_key,
 	max_tokens, max_cost_micros, enabled, priority
 ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
 RETURNING created_at, updated_at`
@@ -116,7 +116,7 @@ func (s *PGUsageCapStore) UpdateUsageCapPolicy(ctx context.Context, tenantID, id
 	}
 	const q = `
 UPDATE usage_cap_policies SET agent_id=$3, provider_id=$4, provider_type=$5,
-	model_id=$6, window=$7, max_tokens=$8, max_cost_micros=$9,
+	model_id=$6, window_key=$7, max_tokens=$8, max_cost_micros=$9,
 	enabled=$10, priority=$11, updated_at=now()
 WHERE tenant_id=$1 AND id=$2
 RETURNING updated_at`
@@ -167,13 +167,13 @@ RETURNING true`,
 		var ok bool
 		err = tx.QueryRowContext(ctx, `
 UPDATE usage_cap_counters SET
-	reserved_tokens = reserved_tokens + $4,
-	reserved_cost_micros = reserved_cost_micros + $5,
-	updated_at = now()
+		reserved_tokens = reserved_tokens + $3,
+		reserved_cost_micros = reserved_cost_micros + $4,
+		updated_at = now()
 WHERE policy_id=$1 AND window_start=$2
-  AND ($6::bigint IS NULL OR used_tokens + reserved_tokens + $4 <= $6)
-  AND ($7::bigint IS NULL OR used_cost_micros + reserved_cost_micros + $5 <= $7)
-	RETURNING true`, p.ID, start, end, req.EstimatedTokens, req.EstimatedCostMicros, intPtrVal(p.MaxTokens), intPtrVal(p.MaxCostMicros)).Scan(&ok)
+	  AND ($5::bigint IS NULL OR used_tokens + reserved_tokens + $3 <= $5)
+	  AND ($6::bigint IS NULL OR used_cost_micros + reserved_cost_micros + $4 <= $6)
+		RETURNING true`, p.ID, start, req.EstimatedTokens, req.EstimatedCostMicros, intPtrVal(p.MaxTokens), intPtrVal(p.MaxCostMicros)).Scan(&ok)
 		if err != nil {
 			if !errors.Is(err, sql.ErrNoRows) {
 				return nil, err
@@ -339,7 +339,7 @@ SELECT EXISTS (
 }
 
 const policySelectSQL = `SELECT id, tenant_id, agent_id, provider_id, COALESCE(provider_type,''), COALESCE(model_id,''),
-	window, max_tokens, max_cost_micros, enabled, priority, created_at, updated_at FROM usage_cap_policies`
+	window_key, max_tokens, max_cost_micros, enabled, priority, created_at, updated_at FROM usage_cap_policies`
 
 func scanPolicy(row scanner) (store.UsageCapPolicy, error) {
 	var p store.UsageCapPolicy

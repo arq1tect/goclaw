@@ -93,7 +93,7 @@ Usage cap enforcement is Standard/PostgreSQL-only in round one. The `UsageCapSto
 Tables:
 - `usage_pricing_catalog`: OpenRouter model catalog prices, raw upstream model payload, sync time.
 - `usage_pricing_overrides`: tenant/provider/model override prices for custom billing assumptions.
-- `usage_cap_policies`: cap definitions scoped by tenant, agent, provider, provider type, model, and window.
+- `usage_cap_policies`: cap definitions scoped by tenant, agent, provider, provider type, model, and `window_key`.
 - `usage_cap_counters`: current window used and reserved token/cost counters.
 - `usage_cap_reservations`: preflight reservations keyed by LLM call attempt.
 - `usage_cap_events`: allow/block/reconcile/skip audit events.

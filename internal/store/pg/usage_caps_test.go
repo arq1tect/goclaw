@@ -100,7 +100,7 @@ func TestPGUsageCapStoreRejectsCrossTenantRefs(t *testing.T) {
 	if _, err := db.Exec(
 		`INSERT INTO llm_providers (id, tenant_id, name, provider_type, api_key, enabled)
 		 VALUES ($1,$2,$3,'openrouter','sk-test',true)`,
-		providerID, tenantA, "usage-cap-provider-"+providerID.String(),
+		providerID, tenantA, "ucp-"+providerID.String(),
 	); err != nil {
 		t.Fatalf("seed provider: %v", err)
 	}
@@ -116,7 +116,7 @@ func TestPGUsageCapStoreRejectsCrossTenantRefs(t *testing.T) {
 	if _, err := db.Exec(
 		`INSERT INTO llm_providers (id, tenant_id, name, provider_type, api_key, enabled)
 		 VALUES ($1,$2,$3,'openrouter','sk-test',true)`,
-		masterProviderID, store.MasterTenantID, "usage-cap-master-provider-"+masterProviderID.String(),
+		masterProviderID, store.MasterTenantID, "ucpm-"+masterProviderID.String(),
 	); err != nil {
 		t.Fatalf("seed master provider: %v", err)
 	}
