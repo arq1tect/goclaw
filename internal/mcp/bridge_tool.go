@@ -50,6 +50,10 @@ type BridgeTool struct {
 	timeoutSec        int
 	connected         *atomic.Bool
 	grantChecker      GrantChecker // for runtime grant recheck (nil = skip check)
+	// forceReconnect triggers an out-of-band Initialize when Execute detects
+	// the server reset its session lifecycle. Optional — nil falls back to
+	// "connected=false + wait for health loop". Wired via WithForceReconnect.
+	forceReconnect func(reason string)
 }
 
 // NewBridgeTool creates a BridgeTool from an MCP Tool definition.
@@ -120,6 +124,16 @@ func (t *BridgeTool) Description() string {
 }
 func (t *BridgeTool) Parameters() map[string]any { return t.inputSchema }
 
+// WithForceReconnect attaches a callback used when Execute detects the
+// server reset its session lifecycle (see isSessionUninitializedErr).
+// The callback should dedupe concurrent invocations internally.
+// Optional — leave unset to fall back to flipping connected=false and waiting
+// for the health loop's standard reconnect path.
+func (t *BridgeTool) WithForceReconnect(fn func(reason string)) *BridgeTool {
+	t.forceReconnect = fn
+	return t
+}
+
 // WithHints attaches admin-authored description hints to this tool. Hints are
 // appended to Description() so the LLM sees server-specific quirks (e.g. "no
 // trailing semicolons in code args") without modifying the upstream MCP server.
@@ -175,18 +189,32 @@ func (t *BridgeTool) Execute(ctx context.Context, args map[string]any) *tools.Re
 	if t.grantChecker != nil {
 		agentID := store.AgentIDFromContext(ctx)
 		userID := store.UserIDFromContext(ctx)
-		if !t.grantChecker.IsAllowed(ctx, agentID, userID, t.serverID, t.toolName) {
-			return tools.ErrorResult(fmt.Sprintf("MCP tool %q: grant revoked", t.registeredName))
+		if allowed, reason := t.grantChecker.IsAllowed(ctx, agentID, userID, t.serverID, t.toolName); !allowed {
+			// Surface reason + remediation hint so operators can debug from a
+			// single log line. The tag (server_not_accessible / tool_not_in_allow_list /
+			// load_failed) maps 1:1 to security.mcp_grant_revoked_at_execute logs.
+			return tools.ErrorResult(fmt.Sprintf(
+				"MCP tool %q: grant revoked (reason: %s, server=%s, agent=%s). "+
+					"Check mcp_agent_grants.enabled / tool_allow for this agent+server, "+
+					"or re-grant access via dashboard.",
+				t.registeredName, reason, t.serverName, agentID))
 		}
 	}
 
 	if !t.connected.Load() {
-		return tools.ErrorResult(fmt.Sprintf("MCP server %q is disconnected", t.serverName))
+		return tools.ErrorResult(fmt.Sprintf(
+			"MCP server %q is disconnected (tool %q). The server may be restarting, "+
+				"unreachable, or had its credential revoked — check mcp.server.health_failed / "+
+				"mcp.tool.call.auth_expired logs for the underlying cause.",
+			t.serverName, t.registeredName))
 	}
 
 	client := t.clientPtr.Load() // atomic load — safe during concurrent reconnect
 	if client == nil {
-		return tools.ErrorResult(fmt.Sprintf("MCP server %q has no active client", t.serverName))
+		return tools.ErrorResult(fmt.Sprintf(
+			"MCP server %q has no active client (tool %q). Connection was closed "+
+				"and reconnect has not yet succeeded.",
+			t.serverName, t.registeredName))
 	}
 
 	callCtx, cancel := context.WithTimeout(ctx, time.Duration(t.timeoutSec)*time.Second)
@@ -233,6 +261,30 @@ func (t *BridgeTool) Execute(ctx context.Context, args map[string]any) *tools.Re
 				"user_id", store.UserIDFromContext(ctx),
 				"latency_ms", latencyMs)
 			return tools.ErrorResult(fmt.Sprintf("MCP tool %q: credential expired, please retry", t.registeredName))
+		}
+		// Detect server-side session reset (FastMCP "invalid during session
+		// initialization", mcp-go ErrSessionTerminated, etc.). Trigger an
+		// out-of-band Initialize so the next agent turn finds a healthy
+		// client; return retry hint to the LLM for the current turn.
+		if isSessionUninitializedErr(err) {
+			slog.Warn("mcp.tool.call.session_reset",
+				"server", t.serverName, "tool", t.registeredName,
+				"user_id", store.UserIDFromContext(ctx),
+				"agent_id", store.AgentIDFromContext(ctx),
+				"latency_ms", latencyMs,
+				"error", err.Error(),
+				"action", "force_reconnect_requested")
+			if t.forceReconnect != nil {
+				t.forceReconnect("bridge_tool: " + t.registeredName)
+			} else {
+				// Best-effort fallback: flip connected so the next pool
+				// Acquire takes the reconnect branch. Less reliable than
+				// the explicit force-reconnect path (see WithForceReconnect).
+				t.connected.Store(false)
+			}
+			return tools.ErrorResult(fmt.Sprintf(
+				"MCP tool %q: server %q reset its session — reconnecting in background, please retry",
+				t.registeredName, t.serverName))
 		}
 		slog.Warn("mcp.tool.call.error",
 			"server", t.serverName, "tool", t.registeredName,

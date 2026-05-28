@@ -188,11 +188,35 @@ func (l *Loop) getUserMCPTools(ctx context.Context, userID string) []tools.Tool 
 		// user's BridgeTool (with first user's MCP api_key + pool connection).
 		// The shared registry holds only shared/non-MCP tools (memory, web,
 		// exec, …).
+		//
+		// Filter tools upfront by the agent's grant (info.ToolAllow / ToolDeny)
+		// so the LLM never sees tools it cannot call. Without this, every
+		// per-user MCP server exposes its full tool set and the LLM repeatedly
+		// triggers the runtime "grant revoked" path (visible in the original
+		// agent_brain_external screenshot).
 		hints := mcpbridge.ParseToolHints(srv.Settings)
+		var filteredOut []string
 		for _, mcpTool := range entry.MCPTools() {
+			if !mcpbridge.IsToolAllowed(mcpTool.Name, info.ToolAllow, info.ToolDeny) {
+				filteredOut = append(filteredOut, mcpTool.Name)
+				continue
+			}
 			bt := mcpbridge.NewBridgeTool(srv.Name, mcpTool, entry.ClientPtr(), srv.ToolPrefix, srv.TimeoutSec, entry.Connected(), srv.ID, l.mcpGrantChecker).
-				WithHints(hints.Global, hints.HintFor(mcpTool.Name))
+				WithHints(hints.Global, hints.HintFor(mcpTool.Name)).
+				WithForceReconnect(entry.RequestForceReconnect())
 			userTools = append(userTools, bt)
+		}
+		if len(filteredOut) > 0 {
+			slog.Info("mcp.tools.filtered_at_register",
+				"server", srv.Name,
+				"server_id", srv.ID,
+				"user", userID,
+				"path", "user_cred",
+				"filtered_count", len(filteredOut),
+				"filtered_tools", filteredOut,
+				"allow_size", len(info.ToolAllow),
+				"deny_size", len(info.ToolDeny),
+			)
 		}
 	}
 
