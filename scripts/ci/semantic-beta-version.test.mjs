@@ -59,6 +59,7 @@ function createRepo() {
 
 function runVersionScript(cwd) {
   return run(cwd, ["node", "scripts/ci/semantic-beta-version.mjs"], {
+    GITHUB_OUTPUT: "",
     INITIAL_VERSION: "3.11.3",
     PRERELEASE_ID: "beta",
   });
