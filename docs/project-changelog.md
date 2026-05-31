@@ -6,6 +6,27 @@ Significant changes, features, and fixes in reverse chronological order.
 
 ## 2026-05-29
 
+### Human-like channel delivery MVP (issue #67)
+
+**New**
+
+- Added `gateway.chat_behavior` runtime config for global quick acknowledgement and safe final multi-message splitting.
+- Added per-channel `chat_behavior` override support for channel instances that already participate in channel delivery settings.
+- Quick acknowledgements are emitted only for non-streaming channel runs and are cancelled when a block reply or terminal event arrives.
+- Final splitting applies only to non-streaming text-only final replies; unsafe Markdown, code, tables, lists, quotes, JSON, and URL-only paragraphs stay as one message.
+- Added `chat_behavior.preview` RPC plus dashboard controls and per-channel override fields.
+
+**Validation**
+
+- Added Go coverage for config resolution, preview, conservative splitting, and non-streaming quick acknowledgement delivery.
+- Verified focused Go packages, both Go builds, `go vet`, web Vitest, web production build, and `git diff --check`.
+
+**Out of scope**
+
+- No archive/timeline storage, renderer, share/export, or interleaved run history changes. Those remain issue #76 scope.
+
+---
+
 ### GitHub Releases update scratch dir fallback (issue #94)
 
 - Changed GitHub Releases package updates to prefer `{runtimeDir}/tmp` for

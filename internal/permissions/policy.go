@@ -211,6 +211,7 @@ func isAdminMethod(method string) bool {
 		protocol.MethodConfigPatch,
 		protocol.MethodConfigSchema,
 		protocol.MethodConfigDefaults,
+		protocol.MethodChatBehaviorPreview,
 		protocol.MethodConfigPermissionsList,
 		protocol.MethodConfigPermissionsCheck,
 		protocol.MethodConfigPermissionsGrant,

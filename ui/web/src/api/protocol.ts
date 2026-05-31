@@ -71,6 +71,7 @@ export const Methods = {
   CONFIG_PATCH: "config.patch",
   CONFIG_SCHEMA: "config.schema",
   CONFIG_DEFAULTS: "config.defaults",
+  CHAT_BEHAVIOR_PREVIEW: "chat_behavior.preview",
 
   // Sessions
   SESSIONS_LIST: "sessions.list",
