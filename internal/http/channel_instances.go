@@ -119,13 +119,13 @@ func (h *ChannelInstancesHandler) adminAuth(next http.HandlerFunc) http.HandlerF
 	return requireAuth(permissions.RoleAdmin, next)
 }
 
-func (h *ChannelInstancesHandler) emitCacheInvalidate() {
+func (h *ChannelInstancesHandler) emitCacheInvalidate(key string) {
 	if h.msgBus == nil {
 		return
 	}
 	h.msgBus.Broadcast(bus.Event{
 		Name:    protocol.EventCacheInvalidate,
-		Payload: bus.CacheInvalidatePayload{Kind: bus.CacheKindChannelInstances},
+		Payload: bus.CacheInvalidatePayload{Kind: bus.CacheKindChannelInstances, Key: key},
 	})
 }
 
@@ -228,7 +228,7 @@ func (h *ChannelInstancesHandler) handleCreate(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	h.emitCacheInvalidate()
+	h.emitCacheInvalidate(inst.ID.String())
 	emitAudit(h.msgBus, r, "channel_instance.created", "channel_instance", inst.ID.String())
 	writeJSON(w, http.StatusCreated, maskInstanceHTTP(*inst))
 }
@@ -273,7 +273,7 @@ func (h *ChannelInstancesHandler) handleUpdate(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	h.emitCacheInvalidate()
+	h.emitCacheInvalidate("")
 	emitAudit(h.msgBus, r, "channel_instance.updated", "channel_instance", id.String())
 	writeJSON(w, http.StatusOK, map[string]string{"status": "updated"})
 }
@@ -338,7 +338,7 @@ func (h *ChannelInstancesHandler) handleDelete(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	h.emitCacheInvalidate()
+	h.emitCacheInvalidate("")
 	emitAudit(h.msgBus, r, "channel_instance.deleted", "channel_instance", id.String())
 	writeJSON(w, http.StatusOK, map[string]string{"status": "deleted"})
 }
