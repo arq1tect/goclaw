@@ -1,7 +1,7 @@
 ---
 title: "Human-Like Channel Chat Behavior MVP"
 description: "TDD plan for digitopvn/goclaw#67: quick acknowledgement and safe final multi-message splitting for non-streaming channel delivery, with global gateway plus per-channel config only."
-status: pending
+status: completed
 priority: P2
 branch: "codex/issue-67-human-like-chat-behavior"
 tags: [issue-67, channels, chat-behavior, tdd, web-ui]
@@ -38,11 +38,11 @@ Recommended architecture: resolve behavior config into `RunContext` at run regis
 
 | Phase | Name | Status |
 |-------|------|--------|
-| 1 | [Contract and Splitter Tests](./phase-01-contract-and-splitter-tests.md) | Pending |
-| 2 | [Config Resolution and Preview API](./phase-02-config-resolution-and-preview-api.md) | Pending |
-| 3 | [Runtime Acknowledgement and Final Splitting](./phase-03-runtime-acknowledgement-and-final-splitting.md) | Pending |
-| 4 | [Dashboard Controls and Channel Overrides](./phase-04-dashboard-controls-and-channel-overrides.md) | Pending |
-| 5 | [Validation and Handoff](./phase-05-validation-and-handoff.md) | Pending |
+| 1 | [Contract and Splitter Tests](./phase-01-contract-and-splitter-tests.md) | Completed |
+| 2 | [Config Resolution and Preview API](./phase-02-config-resolution-and-preview-api.md) | Completed |
+| 3 | [Runtime Acknowledgement and Final Splitting](./phase-03-runtime-acknowledgement-and-final-splitting.md) | Completed |
+| 4 | [Dashboard Controls and Channel Overrides](./phase-04-dashboard-controls-and-channel-overrides.md) | Completed |
+| 5 | [Validation and Handoff](./phase-05-validation-and-handoff.md) | Completed |
 
 ## Dependencies
 
@@ -56,14 +56,21 @@ Recommended architecture: resolve behavior config into `RunContext` at run regis
 
 ## Acceptance Criteria
 
-- [ ] Ack sends only for non-streaming channel runs when enabled and gate passes.
-- [ ] Ack does not send for Web UI, streaming channel runs, disabled config, silent replies, or quick-complete runs.
-- [ ] Final split sends at most configured max messages, with configured delay between extra messages.
-- [ ] Splitter preserves fenced code, quotes, tables, lists, structured JSON/YAML/XML, links, and short messages.
-- [ ] Global gateway and per-channel config override resolution is deterministic and tested.
-- [ ] Preview API returns ack decision and split parts without sending messages.
-- [ ] Dashboard exposes global controls and per-channel overrides with i18n in en/vi/zh.
-- [ ] No schema/timeline persistence added; no issue #76 file overlap except references.
+- [x] Ack sends only for non-streaming channel runs when enabled and gate passes.
+- [x] Ack does not send for Web UI, streaming channel runs, disabled config, silent replies, or quick-complete runs.
+- [x] Final split sends at most configured max messages, with configured delay between extra messages.
+- [x] Splitter preserves fenced code, quotes, tables, lists, structured JSON/YAML/XML, links, and short messages.
+- [x] Global gateway and per-channel config override resolution is deterministic and tested.
+- [x] Preview API returns ack decision and split parts without sending messages.
+- [x] Dashboard exposes global controls and per-channel overrides with i18n in en/vi/zh.
+- [x] No schema/timeline persistence added; no issue #76 file overlap except references.
+
+## Completion Evidence
+
+- GitHub issue `digitopvn/goclaw#67` is closed.
+- Beta implementation shipped via `digitopvn/goclaw#99`.
+- Project changelog records the human-like channel delivery MVP.
+- Follow-up channel behavior fixes passed GitHub CI in `digitopvn/goclaw#135` and `digitopvn/goclaw#139`.
 
 ## Validation Commands
 

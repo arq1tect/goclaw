@@ -40,6 +40,11 @@ All notable changes to GoClaw are documented here. For full documentation, see [
 
 ### Changed
 
+- **Config Behavior explanations** — Adds purpose tooltips for Tool Status
+  Messages, Intermediate Replies, and Quick Acknowledgement so admins can
+  distinguish debug progress, natural intermediate updates, and receipt-only
+  acknowledgement behavior in the web UI.
+
 - **ChatGPT Subscription (OAuth)** — default model and backend-owned model catalog
   now prefer `gpt-5.5`, with reasoning metadata and context-window defaults updated
   for provider-first model selection.

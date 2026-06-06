@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import { InfoLabel } from "@/components/shared/info-label";
 
 const quickAckModeValues = ["llm_generated", "fixed_template", "off"] as const;
 type QuickAckMode = (typeof quickAckModeValues)[number];
@@ -97,7 +98,7 @@ export function BehaviorChatCard({ value, onChange }: Props) {
           <div className="space-y-3 rounded-md border p-3">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <Label>{t("behavior.quickAck")}</Label>
+                <InfoLabel tip={t("behavior.quickAckPurpose")}>{t("behavior.quickAck")}</InfoLabel>
                 <p className="text-xs text-muted-foreground">{t("behavior.quickAckHint")}</p>
               </div>
               <Switch
