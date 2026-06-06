@@ -74,10 +74,14 @@ func (p *OpenAIProvider) buildRequestBody(model string, req ChatRequest, stream 
 				})
 			}
 			for _, img := range m.Images {
+				urlVal := img.URL
+				if urlVal == "" {
+					urlVal = fmt.Sprintf("data:%s;base64,%s", img.MimeType, img.Data)
+				}
 				parts = append(parts, map[string]any{
 					"type": "image_url",
 					"image_url": map[string]any{
-						"url": fmt.Sprintf("data:%s;base64,%s", img.MimeType, img.Data),
+						"url": urlVal,
 					},
 				})
 			}

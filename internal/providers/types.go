@@ -113,10 +113,11 @@ type StreamChunk struct {
 	Images   []ImageContent `json:"images,omitempty"` // image generation frames (Codex)
 }
 
-// ImageContent represents a base64-encoded image for vision-capable models.
+// ImageContent represents an image (either base64-encoded or a direct URL) for vision-capable models.
 type ImageContent struct {
 	MimeType string `json:"mime_type"`         // e.g. "image/jpeg"
 	Data     string `json:"data"`              // base64-encoded image bytes
+	URL      string `json:"url,omitempty"`     // URL of the image
 	Partial  bool   `json:"partial,omitempty"` // true for intermediate frames (Codex image_generation_call)
 }
 
