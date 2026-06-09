@@ -149,6 +149,16 @@ func (s *ToolStage) preflightToolCalls(ctx context.Context, state *RunState, too
 }
 
 func (s *ToolStage) preflightToolCall(ctx context.Context, state *RunState, tc providers.ToolCall) (providers.ToolCall, *providers.Message) {
+	if s.deps.AuthorizeToolCall != nil {
+		if ok, reason := s.deps.AuthorizeToolCall(ctx, state, tc); !ok {
+			return tc, &providers.Message{
+				Role:       "tool",
+				Content:    reason,
+				ToolCallID: tc.ID,
+				IsError:    true,
+			}
+		}
+	}
 	r, _ := s.deps.FireHook(ctx, hooks.Event{
 		EventID:   uuid.NewString(),
 		SessionID: state.Input.SessionKey,
